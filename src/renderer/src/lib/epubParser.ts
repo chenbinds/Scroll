@@ -14,6 +14,7 @@ export interface EpubMetadata {
 export interface TocItem {
   label: string
   href: string
+  spineIndex: number // maps directly to spine array index for reliable navigation
   subitems?: TocItem[]
 }
 
@@ -32,7 +33,6 @@ export async function parseEpub(base64Data: string): Promise<EpubContent> {
   for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i)
 
   const zip = await JSZip.loadAsync(bytes)
-  const files = new Map<string, string>()
 
   // Extract all images from ZIP as base64 data URLs
   const imageDataUrls = new Map<string, string>()
@@ -67,21 +67,25 @@ export async function parseEpub(base64Data: string): Promise<EpubContent> {
 
   const { metadata, manifest, spine } = parseOpf(opfXml, opfDir)
 
+  // Build resolved spine array (id + resolved href)
+  const resolvedSpine = spine.map((s) => ({
+    id: s.id,
+    href: manifest.find((m) => m.id === s.id)?.href || ''
+  }))
+
   // Load spine HTML files, resolve image src to data URLs
-  for (const item of spine) {
-    const maniEntry = manifest.find((m) => m.id === item.id)
-    if (!maniEntry) continue
-    const htmlFile = zip.file(maniEntry.href)
+  const files = new Map<string, string>()
+  for (const item of resolvedSpine) {
+    const htmlFile = zip.file(item.href)
     if (!htmlFile) continue
     try {
       let html = await htmlFile.async('text')
-      const chapterDir = maniEntry.href.includes('/')
-        ? maniEntry.href.substring(0, maniEntry.href.lastIndexOf('/') + 1)
+      const chapterDir = item.href.includes('/')
+        ? item.href.substring(0, item.href.lastIndexOf('/') + 1)
         : ''
 
       // Generic resolver for any image reference
       const resolveUrl = (attrValue: string): string | null => {
-        // Remove fragment and query
         const cleanPath = attrValue.split('#')[0].split('?')[0]
         if (!cleanPath) return null
 
@@ -92,7 +96,6 @@ export async function parseEpub(base64Data: string): Promise<EpubContent> {
         if (chapterDir) {
           const resolved = chapterDir + cleanPath.replace(/^\.\//, '')
           if (imageDataUrls.has(resolved)) return imageDataUrls.get(resolved)!
-          // Also try with ../ resolved
           const normalized = resolveRelative(chapterDir, cleanPath)
           if (imageDataUrls.has(normalized)) return imageDataUrls.get(normalized)!
         }
@@ -112,34 +115,71 @@ export async function parseEpub(base64Data: string): Promise<EpubContent> {
         return null
       }
 
-      // Replace src=, href=, xlink:href= in img/image/source elements
       html = html.replace(/\b(src|href|xlink:href)=["']([^"']+)["']/gi,
         (_full: string, attr: string, value: string) => {
           const dataUrl = resolveUrl(value)
           return dataUrl ? `${attr}="${dataUrl}"` : _full
         })
-      files.set(maniEntry.href, html)
+      files.set(item.href, html)
     } catch {
       // skip files that fail to load
     }
   }
 
-  // Build TOC
+  // Build TOC — resolve NCX paths relative to NCX file location
   let toc: TocItem[] = []
   const ncxFiles = Object.keys(zip.files).filter((f) => f.endsWith('.ncx'))
   if (ncxFiles.length > 0) {
-    const ncxFile = zip.file(ncxFiles[0])
+    const ncxPath = ncxFiles[0]
+    const ncxDir = ncxPath.includes('/') ? ncxPath.substring(0, ncxPath.lastIndexOf('/') + 1) : ''
+    const ncxFile = zip.file(ncxPath)
     if (ncxFile) {
       const ncxXml = await ncxFile.async('text')
-      toc = parseNcx(ncxXml)
+      toc = parseNcx(ncxXml, ncxDir)
     }
   }
 
+  // If no NCX TOC, generate from spine
   if (toc.length === 0) {
-    toc = spine.map((s, i) => ({
+    toc = resolvedSpine.map((s, i) => ({
       label: `Chapter ${i + 1}`,
-      href: manifest.find((m) => m.id === s.id)?.href || ''
+      href: s.href,
+      spineIndex: i
     }))
+  }
+
+  // Match each TOC item to its spine index by comparing resolved hrefs
+  for (const item of toc) {
+    if (item.spineIndex !== undefined) continue // already set
+
+    const tocHref = item.href.replace(/#.*$/, '') // strip fragment
+    // Find matching spine entry (exact match first, then filename match)
+    let matchedIndex = resolvedSpine.findIndex(
+      (s) => s.href === tocHref || s.href === item.href
+    )
+    if (matchedIndex < 0) {
+      const tocFile = tocHref.split('/').pop() || ''
+      matchedIndex = resolvedSpine.findIndex(
+        (s) => (s.href.split('/').pop() || '') === tocFile
+      )
+    }
+    item.spineIndex = matchedIndex >= 0 ? matchedIndex : 0
+    // Also fix subitems
+    if (item.subitems) {
+      for (const sub of item.subitems) {
+        const subHref = sub.href.replace(/#.*$/, '')
+        let subIdx = resolvedSpine.findIndex(
+          (s) => s.href === subHref || s.href === sub.href
+        )
+        if (subIdx < 0) {
+          const subFile = subHref.split('/').pop() || ''
+          subIdx = resolvedSpine.findIndex(
+            (s) => (s.href.split('/').pop() || '') === subFile
+          )
+        }
+        sub.spineIndex = subIdx >= 0 ? subIdx : 0
+      }
+    }
   }
 
   return {
@@ -148,10 +188,7 @@ export async function parseEpub(base64Data: string): Promise<EpubContent> {
       author: metadata.creator || 'Unknown Author'
     },
     toc,
-    spine: spine.map((s) => ({
-      id: s.id,
-      href: manifest.find((m) => m.id === s.id)?.href || ''
-    })),
+    spine: resolvedSpine,
     files
   }
 }
@@ -211,7 +248,7 @@ function resolveRelative(base: string, rel: string): string {
   return parts.join('/')
 }
 
-function parseNcx(xml: string): TocItem[] {
+function parseNcx(xml: string, baseDir: string): TocItem[] {
   const items: TocItem[] = []
   const navMapMatch = xml.match(/<navMap>([\s\S]*?)<\/navMap>/)
   if (!navMapMatch) return items
@@ -222,7 +259,13 @@ function parseNcx(xml: string): TocItem[] {
     const labelMatch = np[1].match(/<text>([^<]+)<\/text>/)
     const srcMatch = np[1].match(/src="([^"]+)"/)
     if (labelMatch && srcMatch) {
-      items.push({ label: labelMatch[1], href: srcMatch[1] })
+      // Resolve relative to NCX file location, then strip fragment for matching
+      const resolvedHref = resolveRelative(baseDir, srcMatch[1])
+      items.push({
+        label: labelMatch[1],
+        href: resolvedHref,
+        spineIndex: -1 // will be resolved later
+      })
     }
   }
 

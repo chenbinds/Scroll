@@ -99,3 +99,75 @@ printf '@echo off\r\ncd /d "%%~dp0"\r\n...' > file.bat
 ```
 
 **全局规则更新：** 写入 `~/.claude/memory/golden-rules-bat-files.md`，明确 bat 文件必须用 printf 写入，不能用 Write 工具。
+
+---
+
+## 2026-07-11 — 阅读器核心功能修复（4 项，第二轮）
+
+> 参考了 koodo-reader 的实现思路：用 spine index 做精确导航，而非 DOM href 字符串模糊匹配。
+
+### Bug 6 (第二轮): 点击目录无法跳转到对应章节
+
+**根因深入分析：**
+- 原来的方案依赖 `querySelector('[data-href="..."]')` + 文件名模糊匹配来找 DOM 元素
+- NCX TOC 路径和 manifest spine 路径的解析基准目录不同（一个相对 NCX，一个相对 OPF），即使都正确解析也会出现差异
+- koodo-reader 的做法：在解析阶段就把每个 TOC item 映射到 spine 数组的 index，跳转时直接按 index 找 DOM（`[data-chapter="{index}"]`）
+
+**修复（重写）：**
+1. `epubParser.ts`:
+   - `TocItem` 新增 `spineIndex: number` 字段
+   - 解析完 spine + TOC 后，对每个 TOC item 按 href（去 fragment）与 spine href 做精确匹配，再降级到文件名匹配，填入正确的 spineIndex
+   - `parseNcx()` 仍然用 NCX 目录解析相对路径
+2. `EpubReader.tsx`: TOC 导航改为：
+   - 从 store 中按 href 找到对应的 TocItem → 取其 `spineIndex`
+   - `setRenderedChapters` 激活目标章节及前后 3 章
+   - 100ms 后 scrollIntoView 到 `[data-chapter="{index}"]`
+3. `TocPanel.tsx`: 无需改动，仍传 `href`，匹配逻辑在 EpubReader 的 useEffect 中完成
+
+---
+
+### Bug 7 (第二轮): 阅读进度无法记录
+
+**根因深入分析：**
+- 纯百分比进度对虚拟渲染不友好：进度值依赖 `scrollHeight`，而虚拟渲染下 `scrollHeight` 随章节激活不断变化
+- koodo-reader 的做法：记录 **chapterIndex**（spine 位置），下次打开直接渲染目标章节附近的内容
+
+**修复（重写）：**
+1. `EpubReader.tsx`:
+   - `onProgress` 回调签名改为 `(chapterIndex, chapterCount, percent)` — 同时上报当前章节索引
+   - 进度恢复接收 `initialChapterIndex`（而非 percent）：
+     - 首次渲染时，激活 `initialChapterIndex +/- 3` 范围内的章节
+     - 轮询（20次×200ms）等待目标章节 DOM 就位后 `scrollIntoView`
+   - 内部用 `hasRestoredRef` 确保只恢复一次
+2. `App.tsx`:
+   - EPUB `onProgress` 中将 chapterIndex 存入 `currentPage` 字段（复用为章节索引）
+   - 打开书籍时传 `initialChapterIndex={currentBook.currentPage || 0}`
+
+---
+
+### Bug 8 (第二轮): 点击目录后页面非常卡
+
+**根因深入分析：**
+- 每个 ChapterPlaceholder 独立创建 IntersectionObserver → 200 章 = 200 Observer
+- smooth scrollIntoView 产生大量 scroll 事件 → 所有 Observer 同时回调 → React 级联重渲染
+- koodo-reader 使用 epub.js 的 iframe 隔离，天然不存在此问题
+
+**修复（重写）：**
+1. `ChapterPlaceholder`:
+   - Observer 的 `rootMargin` 扩大到 800px（更早激活，减少碰撞）
+   - 加 `activatedRef` 防止同一 placeholder 重复激活
+   - 移除 `animate-pulse`（持续的 CSS 动画消耗 GPU）
+   - 用固定 `height` 替代 `minHeight`，减少 layout thrashing
+2. `ChapterList` scroll handler:
+   - 新增 150ms 节流（`lastCheck`），减少 rAF 回调频率
+   - 保留 1.5x viewport buffer
+
+---
+
+### Bug 9: 书签功能无效（第一轮修复保留）
+
+**修复确认：**
+- 书签持久化：App.tsx 启动加载 + 变更时自动保存
+- 自动标签：`"HH:mm - X%"` 格式
+- 点击导航：通过 `navigateToPercent` → EpubReader/TxtReader 滚动到百分比位置
+- 删除按钮：`stopPropagation` 防误触

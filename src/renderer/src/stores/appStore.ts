@@ -23,53 +23,63 @@ export interface AiConfig {
 }
 
 interface AppState {
-  // 视图
+  // View
   currentView: 'library' | 'reader'
   setCurrentView: (view: 'library' | 'reader') => void
 
-  // 主题
+  // Theme
   darkMode: boolean
   setDarkMode: (dark: boolean) => void
   toggleDarkMode: () => void
 
-  // 当前阅读的书籍
+  // Current book
   currentBook: Book | null
   openBook: (book: Book) => void
 
-  // 书架
+  // Library
   books: Book[]
   setBooks: (books: Book[]) => void
   addBook: (book: Book) => void
   removeBook: (id: string) => void
   updateBookProgress: (id: string, progress: number, currentPage: number) => void
 
-  // AI 配置
+  // AI config
   aiConfig: AiConfig
   setAiConfig: (config: Partial<AiConfig>) => void
 
-  // 左侧栏（目录 + 书签）
+  // Left sidebar (TOC + Bookmarks)
   leftSidebarOpen: boolean
   leftSidebarTab: 'toc' | 'bookmarks'
   toggleLeftSidebar: (tab: 'toc' | 'bookmarks') => void
-  // 右侧栏（AI 助手）
+  // Right sidebar (AI)
   rightSidebarOpen: boolean
   toggleRightSidebar: () => void
 
   // TOC (for EPUB)
-  toc: { label: string; href: string; subitems?: { label: string; href: string }[] }[]
+  toc: { label: string; href: string; spineIndex: number; subitems?: { label: string; href: string; spineIndex: number }[] }[]
   setToc: (toc: AppState['toc']) => void
   navigateToHref: string | null
   setNavigateToHref: (href: string | null) => void
+  navigateToSpineIndex: number | null
+  setNavigateToSpineIndex: (idx: number | null) => void
+  // Direct-call navigation (bypasses useEffect for reliability)
+  _navFn: ((index: number) => void) | null
+  _setNavFn: (fn: ((index: number) => void) | null) => void
 
   // Bookmarks
-  bookmarks: { label: string; href: string; page?: number; percent?: number; time: number }[]
+  bookmarks: { label: string; href?: string; page?: number; percent?: number; time: number }[]
   addBookmark: (bm: AppState['bookmarks'][0]) => void
   removeBookmark: (index: number) => void
   clearBookmarks: () => void
+  setBookmarks: (bookmarks: AppState['bookmarks']) => void
 
   // Current reading position (for bookmark capture)
   readingPosition: { chapter?: string; page?: number; percent: number }
   setReadingPosition: (pos: { chapter?: string; page?: number; percent: number }) => void
+
+  // Navigate to a percentage position (for bookmark jump)
+  navigateToPercent: number | null
+  setNavigateToPercent: (pct: number | null) => void
 
   // AI context (current book + chapter content)
   aiContext: { bookTitle: string; chapter?: string; content?: string }
@@ -91,7 +101,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   setBooks: (books) => set({ books }),
   addBook: (book) =>
     set((s) => {
-      // 避免重复添加
       if (s.books.find((b) => b.path === book.path)) return s
       return { books: [book, ...s.books] }
     }),
@@ -104,7 +113,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     })),
 
   aiConfig: {
-    name: '未配置',
+    name: 'Not configured',
     baseUrl: '',
     apiKey: '',
     model: '',
@@ -125,14 +134,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   setToc: (toc) => set({ toc }),
   navigateToHref: null,
   setNavigateToHref: (href) => set({ navigateToHref: href }),
+  navigateToSpineIndex: null,
+  setNavigateToSpineIndex: (idx) => set({ navigateToSpineIndex: idx }),
+  _navFn: null,
+  _setNavFn: (fn) => set({ _navFn: fn }),
 
   bookmarks: [],
   addBookmark: (bm) => set((s) => ({ bookmarks: [...s.bookmarks, bm] })),
   removeBookmark: (index) => set((s) => ({ bookmarks: s.bookmarks.filter((_, i) => i !== index) })),
   clearBookmarks: () => set({ bookmarks: [] }),
+  setBookmarks: (bookmarks) => set({ bookmarks }),
 
   readingPosition: { percent: 0 },
   setReadingPosition: (pos) => set((s) => ({ readingPosition: { ...s.readingPosition, ...pos } })),
+
+  navigateToPercent: null,
+  setNavigateToPercent: (pct) => set({ navigateToPercent: pct }),
 
   aiContext: { bookTitle: '' },
   setAiContext: (ctx) => set((s) => ({ aiContext: { ...s.aiContext, ...ctx } }))

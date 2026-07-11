@@ -1,19 +1,26 @@
-import { X, BookmarkPlus } from 'lucide-react'
+import { X, BookmarkPlus, ArrowRight } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useI18n } from '../../lib/i18n'
 
 export default function BookmarkPanel() {
   const { t } = useI18n()
-  const { bookmarks, addBookmark, removeBookmark, readingPosition } = useAppStore()
+  const { bookmarks, addBookmark, removeBookmark, readingPosition, setNavigateToPercent, currentBook } = useAppStore()
 
   const handleAdd = () => {
-    const label = prompt(t('music.prompt.title')) || `${t('app.bookmarks')} ${bookmarks.length + 1}`
+    const now = new Date()
+    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+    const label = `${timeStr} - ${readingPosition.percent}%`
     addBookmark({
       label,
-      page: readingPosition.page,
       percent: readingPosition.percent,
       time: Date.now()
     })
+  }
+
+  const handleNavigate = (percent: number | undefined) => {
+    if (percent !== undefined) {
+      setNavigateToPercent(percent)
+    }
   }
 
   const formatTime = (ts: number) => {
@@ -42,8 +49,9 @@ export default function BookmarkPanel() {
         ) : (
           bookmarks.map((bm, i) => (
             <div key={i}
+              onClick={() => handleNavigate(bm.percent)}
               className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800/50
-                         hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors group">
+                         hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors group cursor-pointer">
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{bm.label}</p>
                 <p className="text-xs text-gray-400 dark:text-gray-600">
@@ -51,7 +59,7 @@ export default function BookmarkPanel() {
                   {' · '}{formatTime(bm.time)}
                 </p>
               </div>
-              <button onClick={() => removeBookmark(i)}
+              <button onClick={(e) => { e.stopPropagation(); removeBookmark(i) }}
                 className="p-0.5 text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
                 <X size={14} />
               </button>

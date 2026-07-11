@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import { parseTxt, type TxtChapter } from '../../lib/txtParser'
 import { useAppStore } from '../../stores/appStore'
+import { useI18n } from '../../lib/i18n'
 
 interface Props {
   filePath: string
@@ -11,12 +12,14 @@ interface Props {
 }
 
 export default function TxtReader({ filePath, onClose, onProgress, initialProgress }: Props) {
+  const { t } = useI18n()
   const [chapters, setChapters] = useState<TxtChapter[]>([])
   const [title, setTitle] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [fontSize, setFontSize] = useState(100)
   const contentRef = useRef<HTMLDivElement>(null)
+  const restoreAttemptRef = useRef(0)
 
   // Load TXT
   useEffect(() => {
@@ -41,7 +44,8 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
         // Push TOC to sidebar
         const toc = parsed.map((ch, i) => ({
           label: ch.title,
-          href: `chapter-${i}`
+          href: `chapter-${i}`,
+          spineIndex: i
         }))
         useAppStore.getState().setToc(toc)
         // Push first chapter to AI context
@@ -53,16 +57,6 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
         }
 
         setLoading(false)
-
-        // Restore reading position
-        if (initialProgress && initialProgress > 0 && initialProgress < 100 && contentRef.current) {
-          setTimeout(() => {
-            if (contentRef.current) {
-              const total = contentRef.current.scrollHeight - contentRef.current.clientHeight
-              contentRef.current.scrollTop = (total * initialProgress) / 100
-            }
-          }, 800)
-        }
       } catch (err) {
         if (cancelled) return
         setError('Failed to load file.')
@@ -70,8 +64,38 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
       }
     }
     load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      // Clear TOC when reader unmounts
+      useAppStore.getState().setToc([])
+    }
   }, [filePath])
+
+  // Restore reading position — retry until content height is meaningful
+  useEffect(() => {
+    if (chapters.length === 0 || !contentRef.current) return
+    if (!initialProgress || initialProgress <= 0 || initialProgress >= 100) return
+
+    restoreAttemptRef.current = 0
+    let timer: ReturnType<typeof setTimeout>
+
+    const tryRestore = () => {
+      const el = contentRef.current
+      if (!el) return
+      const total = el.scrollHeight - el.clientHeight
+      if (total > 500) {
+        el.scrollTop = Math.round((total * initialProgress) / 100)
+        return
+      }
+      restoreAttemptRef.current++
+      if (restoreAttemptRef.current < 30) {
+        timer = setTimeout(tryRestore, 200)
+      }
+    }
+
+    timer = setTimeout(tryRestore, 400)
+    return () => clearTimeout(timer)
+  }, [chapters, initialProgress])
 
   // Scroll progress
   useEffect(() => {
@@ -107,15 +131,30 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
   const increaseFont = useCallback(() => setFontSize((s) => Math.min(s + 10, 200)), [])
   const decreaseFont = useCallback(() => setFontSize((s) => Math.max(s - 10, 60)), [])
 
-  // TOC navigation
-  const { navigateToHref, setNavigateToHref } = useAppStore()
+  // TOC navigation — spineIndex directly from TocPanel
+  const { navigateToSpineIndex, setNavigateToSpineIndex } = useAppStore()
   useEffect(() => {
-    if (navigateToHref && contentRef.current) {
-      const el = contentRef.current.querySelector(`[data-id="${CSS.escape(navigateToHref)}"]`)
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      setNavigateToHref(null)
+    if (navigateToSpineIndex === null || !contentRef.current) return
+
+    const el = contentRef.current.querySelector(`[data-id="chapter-${navigateToSpineIndex}"]`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
-  }, [navigateToHref])
+    setNavigateToSpineIndex(null)
+  }, [navigateToSpineIndex])
+
+  // Bookmark navigation: scroll to percentage position
+  const { navigateToPercent, setNavigateToPercent } = useAppStore()
+  useEffect(() => {
+    if (navigateToPercent === null || !contentRef.current) return
+
+    const el = contentRef.current
+    const total = el.scrollHeight - el.clientHeight
+    if (total > 0) {
+      el.scrollTop = Math.round((total * navigateToPercent) / 100)
+    }
+    setNavigateToPercent(null)
+  }, [navigateToPercent])
 
   // Keyboard
   useEffect(() => {

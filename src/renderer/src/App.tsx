@@ -15,7 +15,6 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode)
-    // Sync native window background for ClearType sub-pixel AA on Windows
     window.scrollAPI.setBackgroundColor(darkMode ? '#111827' : '#ffffff').catch(() => {})
   }, [darkMode])
 
@@ -42,6 +41,19 @@ export default function App() {
     }
   }, [books])
 
+  // Load bookmarks from storage on startup
+  useEffect(() => {
+    window.scrollAPI.storage.get('bookmarks', []).then((saved: unknown) => {
+      if (Array.isArray(saved)) useAppStore.getState().setBookmarks(saved)
+    }).catch(() => {})
+  }, [])
+
+  // Save bookmarks whenever they change
+  const { bookmarks } = useAppStore()
+  useEffect(() => {
+    window.scrollAPI.storage.set('bookmarks', bookmarks).catch(() => {})
+  }, [bookmarks])
+
   // Save AI config
   const { aiConfig } = useAppStore()
   useEffect(() => {
@@ -52,7 +64,7 @@ export default function App() {
 
   // Persist darkMode preference
   useEffect(() => {
-    window.scrollAPI.storage.get('darkMode', true).then((saved) => {
+    window.scrollAPI.storage.get('darkMode', true).then((saved: unknown) => {
       if (typeof saved === 'boolean') useAppStore.getState().setDarkMode(saved)
     }).catch(() => {})
   }, [])
@@ -62,8 +74,8 @@ export default function App() {
 
   // Load AI config on startup
   useEffect(() => {
-    window.scrollAPI.storage.get('aiConfig', null).then((saved) => {
-      if (saved) useAppStore.getState().setAiConfig(saved)
+    window.scrollAPI.storage.get('aiConfig', null).then((saved: unknown) => {
+      if (saved) useAppStore.getState().setAiConfig(saved as Partial<import('./stores/appStore').AiConfig>)
     }).catch(() => {})
   }, [])
 
@@ -74,6 +86,16 @@ export default function App() {
       useAppStore.getState().setReadingPosition({ page, percent: progress })
     }
   }, [currentBook, updateBookProgress])
+
+  // Auto-close left sidebar for formats without TOC (PDF, CBZ, etc.)
+  useEffect(() => {
+    if (!currentBook) return
+    const format = currentBook.format.toUpperCase()
+    const hasToc = format === 'EPUB' || format === 'TXT' || format === 'MD' || format === 'MARKDOWN'
+    if (!hasToc && useAppStore.getState().leftSidebarOpen) {
+      useAppStore.getState().toggleLeftSidebar('toc')
+    }
+  }, [currentBook])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -87,7 +109,7 @@ export default function App() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentView])
+  }, [currentView, setCurrentView])
 
   const renderReader = () => {
     if (!currentBook) return null
@@ -110,11 +132,15 @@ export default function App() {
           <EpubReader
             filePath={currentBook.path}
             onClose={() => setCurrentView('library')}
-            initialProgress={currentBook.progress || undefined}
-            onProgress={(_chapter, progress) => {
+            initialChapterIndex={currentBook.currentPage || 0}
+            onProgress={(chapterIndex, chapterCount, progress) => {
               if (currentBook) {
-                updateBookProgress(currentBook.id, progress, 0)
-                useAppStore.getState().setReadingPosition({ percent: progress })
+                updateBookProgress(currentBook.id, progress, chapterIndex)
+                useAppStore.getState().setReadingPosition({
+                  chapter: String(chapterIndex),
+                  page: chapterIndex,
+                  percent: progress
+                })
               }
             }}
             onTocReady={(toc: TocItem[]) => {
