@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
+import { useState, useEffect, useRef, useCallback, useLayoutEffect, useMemo } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import { parseEpub, type EpubContent, type TocItem } from '../../lib/epubParser'
 import { useAppStore } from '../../stores/appStore'
@@ -65,7 +65,6 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
         if (cancelled) return
 
         setEpubContent(content)
-        epubRef.current = content
         setTitle(content.metadata.title)
         setAuthor(content.metadata.author)
         onTocReady?.(content.toc)
@@ -160,21 +159,22 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
 
   // ---- RENDER ----
 
-  // Build all chapter sections upfront — no lazy rendering
-  const chapterElements = epubContent
-    ? epubContent.spine.map((item, i) => {
-        const html = epubContent.files.get(item.href)
-        return (
-          <section key={i} data-href={item.href} data-chapter={i} className="mb-8">
-            {html ? (
-              <div dangerouslySetInnerHTML={{ __html: extractBody(html) }} />
-            ) : (
-              <div className="text-sm text-gray-400 italic py-4">[Content unavailable]</div>
-            )}
-          </section>
-        )
-      })
-    : null
+  // Build all chapter sections — useMemo avoids recomputing on font size changes
+  const chapterElements = useMemo(() => {
+    if (!epubContent) return null
+    return epubContent.spine.map((item, i) => {
+      const html = epubContent.files.get(item.href)
+      return (
+        <section key={i} data-href={item.href} data-chapter={i} className="mb-8">
+          {html ? (
+            <div dangerouslySetInnerHTML={{ __html: extractBody(html) }} />
+          ) : (
+            <div className="text-sm text-gray-400 italic py-4">[Content unavailable]</div>
+          )}
+        </section>
+      )
+    })
+  }, [epubContent])
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-950">
