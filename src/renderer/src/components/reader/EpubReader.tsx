@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useLayoutEffect, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import { parseEpub, type EpubContent, type TocItem } from '../../lib/epubParser'
 import { useAppStore } from '../../stores/appStore'
@@ -14,10 +14,6 @@ interface Props {
 
 export type { TocItem }
 
-// Module-level ref for TOC navigation (shared between reader and TocPanel)
-// useLayoutEffect sets it before paint — no timing hole, no React re-render cost
-export const epubNavRef: { current: ((index: number) => void) | null } = { current: null }
-
 export default function EpubReader({ filePath, onClose, onProgress, onTocReady, initialChapterIndex }: Props) {
   const { t } = useI18n()
   const [title, setTitle] = useState('')
@@ -26,27 +22,19 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
   const [error, setError] = useState<string | null>(null)
   const [fontSize, setFontSize] = useState(100)
   const [epubContent, setEpubContent] = useState<EpubContent | null>(null)
-  const contentRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement | null>(null)
   const hasRestoredRef = useRef(false)
 
-  // ---- Navigation: useLayoutEffect fires after DOM commit, BEFORE paint ----
-  // When TocPanel renders (same render cycle), user can't click until after paint
-  // So the nav function is always registered before the first possible click
-  const navFn = useCallback((index: number) => {
-    const el = contentRef.current?.querySelector(`[data-chapter="${index}"]`)
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  // Callback ref: stores the DOM element in Zustand for TocPanel to use
+  // Called during React's commit phase — before paint, no timing hole
+  const setContentRef = useCallback((el: HTMLDivElement | null) => {
+    contentRef.current = el
+    useAppStore.getState()._setReaderEl(el)
   }, [])
 
-  useLayoutEffect(() => {
-    epubNavRef.current = navFn
-    return () => { epubNavRef.current = null }
-  }, [navFn])
-
-  // Cleanup on unmount
+  // Cleanup TOC on unmount
   useEffect(() => {
-    return () => {
-      useAppStore.getState().setToc([])
-    }
+    return () => { useAppStore.getState().setToc([]) }
   }, [])
 
   // Load EPUB
@@ -69,7 +57,6 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
         setAuthor(content.metadata.author)
         onTocReady?.(content.toc)
 
-        // AI context
         if (content.spine.length > 0) {
           const firstContent = content.files.get(content.spine[0].href)
           useAppStore.getState().setAiContext({
@@ -89,13 +76,12 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
     return () => { cancelled = true }
   }, [filePath])
 
-  // Restore reading position — chapters are already in DOM (full render), just scroll
+  // Restore reading position
   useEffect(() => {
     if (!epubContent || !contentRef.current || hasRestoredRef.current) return
     if (!initialChapterIndex || initialChapterIndex <= 0) return
 
     hasRestoredRef.current = true
-    // Small delay for layout to settle, then scroll
     requestAnimationFrame(() => {
       const el = contentRef.current?.querySelector(`[data-chapter="${initialChapterIndex}"]`)
       if (el) el.scrollIntoView({ block: 'start' })
@@ -112,7 +98,6 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
       const total = el.scrollHeight - el.clientHeight
       const pct = total > 0 ? Math.round((el.scrollTop / total) * 100) : 0
 
-      // Find current chapter
       let currentIdx = 0
       const chapters = el.querySelectorAll('[data-chapter]')
       const containerRect = el.getBoundingClientRect()
@@ -157,9 +142,7 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
     return () => window.removeEventListener('keydown', handleKey)
   }, [])
 
-  // ---- RENDER ----
-
-  // Build all chapter sections — useMemo avoids recomputing on font size changes
+  // Chapter elements — full render, memoized
   const chapterElements = useMemo(() => {
     if (!epubContent) return null
     return epubContent.spine.map((item, i) => {
@@ -199,8 +182,8 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
         </div>
       </div>
 
-      {/* Content — full render, no virtual scrolling */}
-      <div ref={contentRef} className="flex-1 overflow-auto scrollbar-thin">
+      {/* Content — full render, callback ref stores DOM el for TocPanel */}
+      <div ref={setContentRef} className="flex-1 overflow-auto scrollbar-thin">
         {loading && (
           <div className="flex items-center justify-center h-full">
             <div className="flex gap-1.5">

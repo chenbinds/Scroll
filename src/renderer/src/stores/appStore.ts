@@ -65,6 +65,11 @@ interface AppState {
   // TOC nav refs are module-level exports from EpubReader/TxtReader
   // (useLayoutEffect sets them before paint — no timing hole)
 
+  // Direct DOM reference to the reader scroll container — set via callback ref
+  // TocPanel reads this to find and scroll to chapters
+  _readerEl: HTMLElement | null
+  _setReaderEl: (el: HTMLElement | null) => void
+
   // Bookmarks
   bookmarks: { label: string; href?: string; page?: number; percent?: number; time: number }[]
   addBookmark: (bm: AppState['bookmarks'][0]) => void
@@ -135,6 +140,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setNavigateToHref: (href) => set({ navigateToHref: href }),
   navigateToSpineIndex: null,
   setNavigateToSpineIndex: (idx) => set({ navigateToSpineIndex: idx }),
+  _readerEl: null,
+  _setReaderEl: (el) => set({ _readerEl: el }),
 
 
   bookmarks: [],

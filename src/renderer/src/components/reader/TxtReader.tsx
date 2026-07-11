@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import { parseTxt, type TxtChapter } from '../../lib/txtParser'
 import { useAppStore } from '../../stores/appStore'
@@ -11,9 +11,6 @@ interface Props {
   initialProgress?: number
 }
 
-// Module-level ref for TOC navigation
-export const txtNavRef: { current: ((index: number) => void) | null } = { current: null }
-
 export default function TxtReader({ filePath, onClose, onProgress, initialProgress }: Props) {
   const { t } = useI18n()
   const [chapters, setChapters] = useState<TxtChapter[]>([])
@@ -21,18 +18,14 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [fontSize, setFontSize] = useState(100)
-  const contentRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement | null>(null)
   const hasRestoredRef = useRef(false)
 
-  const navFn = useCallback((index: number) => {
-    const el = contentRef.current?.querySelector(`[data-id="chapter-${index}"]`)
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  // Callback ref: stores DOM el in Zustand for TocPanel
+  const setContentRef = useCallback((el: HTMLDivElement | null) => {
+    contentRef.current = el
+    useAppStore.getState()._setReaderEl(el)
   }, [])
-
-  useLayoutEffect(() => {
-    txtNavRef.current = navFn
-    return () => { txtNavRef.current = null }
-  }, [navFn])
 
   useEffect(() => {
     return () => { useAppStore.getState().setToc([]) }
@@ -162,7 +155,7 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
         </div>
       </div>
 
-      <div ref={contentRef} className="flex-1 overflow-auto scrollbar-thin">
+      <div ref={setContentRef} className="flex-1 overflow-auto scrollbar-thin">
         {loading && (
           <div className="flex items-center justify-center h-full">
             <div className="flex gap-1.5">

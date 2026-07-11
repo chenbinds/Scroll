@@ -149,11 +149,13 @@ export async function parseEpub(base64Data: string): Promise<EpubContent> {
   }
 
   // Match each TOC item to its spine index by comparing resolved hrefs
-  for (const item of toc) {
-    if (item.spineIndex !== undefined) continue // already set
+  // Also fall back to array index for any items that don't match
+  for (let idx = 0; idx < toc.length; idx++) {
+    const item = toc[idx]
+    // Skip if already has a valid spineIndex (from spine-generated TOC)
+    if (item.spineIndex !== undefined && item.spineIndex >= 0) continue
 
     const tocHref = item.href.replace(/#.*$/, '') // strip fragment
-    // Find matching spine entry (exact match first, then filename match)
     let matchedIndex = resolvedSpine.findIndex(
       (s) => s.href === tocHref || s.href === item.href
     )
@@ -163,21 +165,31 @@ export async function parseEpub(base64Data: string): Promise<EpubContent> {
         (s) => (s.href.split('/').pop() || '') === tocFile
       )
     }
+    if (matchedIndex < 0) {
+      // Final fallback: use TOC position (most EPUBs have TOC in spine order)
+      matchedIndex = Math.min(idx, resolvedSpine.length - 1)
+    }
     item.spineIndex = matchedIndex >= 0 ? matchedIndex : 0
+
     // Also fix subitems
     if (item.subitems) {
-      for (const sub of item.subitems) {
+      for (let sIdx = 0; sIdx < item.subitems.length; sIdx++) {
+        const sub = item.subitems[sIdx]
+        if (sub.spineIndex !== undefined && sub.spineIndex >= 0) continue
         const subHref = sub.href.replace(/#.*$/, '')
-        let subIdx = resolvedSpine.findIndex(
+        let subMatched = resolvedSpine.findIndex(
           (s) => s.href === subHref || s.href === sub.href
         )
-        if (subIdx < 0) {
+        if (subMatched < 0) {
           const subFile = subHref.split('/').pop() || ''
-          subIdx = resolvedSpine.findIndex(
+          subMatched = resolvedSpine.findIndex(
             (s) => (s.href.split('/').pop() || '') === subFile
           )
         }
-        sub.spineIndex = subIdx >= 0 ? subIdx : 0
+        if (subMatched < 0) {
+          subMatched = Math.min(idx, resolvedSpine.length - 1)
+        }
+        sub.spineIndex = subMatched >= 0 ? subMatched : 0
       }
     }
   }
@@ -238,9 +250,10 @@ function parseOpf(xml: string, baseDir: string): {
   return { metadata, manifest, spine }
 }
 
-function resolveRelative(base: string, rel: string): string {
-  const parts = base.replace(/\/$/, '').split('/')
-  parts.pop() // remove filename part
+function resolveRelative(baseDir: string, rel: string): string {
+  // baseDir is a directory path (e.g. "OEBPS/" or ""), NOT a file path
+  const dir = baseDir.replace(/\/$/, '')  // strip trailing slash
+  const parts = dir ? dir.split('/') : []  // directory parts, no pop needed
   for (const seg of rel.split('/')) {
     if (seg === '..') parts.pop()
     else if (seg !== '.') parts.push(seg)

@@ -1,16 +1,18 @@
 import { useAppStore } from '../../stores/appStore'
 import { useI18n } from '../../lib/i18n'
-import { epubNavRef } from '../reader/EpubReader'
-import { txtNavRef } from '../reader/TxtReader'
 
 export default function TocPanel() {
   const { t } = useI18n()
   const { currentBook, toc } = useAppStore()
 
   const handleClick = (spineIndex: number) => {
-    // Try EPUB nav first, then TXT nav
-    const navFn = epubNavRef.current || txtNavRef.current
-    if (navFn) navFn(spineIndex)
+    const readerEl = useAppStore.getState()._readerEl
+    if (!readerEl) return
+    const target = readerEl.querySelector(`[data-chapter="${spineIndex}"]`)
+      || readerEl.querySelector(`[data-id="chapter-${spineIndex}"]`)
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
   }
 
   if (toc.length === 0) {
