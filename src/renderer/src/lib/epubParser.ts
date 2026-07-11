@@ -133,26 +133,27 @@ export async function parseEpub(base64Data: string): Promise<EpubContent> {
   }
 
   // Assign spineIndex to all TOC items (including nested subitems)
+  let globalIdx = 0
   function assignSpineIndex(items: TocItem[]) {
-    for (let idx = 0; idx < items.length; idx++) {
-      const item = items[idx]
-      if (item.spineIndex >= 0) continue
-
-      const tocHref = item.href.replace(/#.*$/, '')
-      let matchedIndex = resolvedSpine.findIndex(
-        (s) => s.href === tocHref || s.href === item.href
-      )
-      if (matchedIndex < 0) {
-        const tocFile = tocHref.split('/').pop() || ''
-        matchedIndex = resolvedSpine.findIndex(
-          (s) => (s.href.split('/').pop() || '') === tocFile
+    for (const item of items) {
+      if (item.spineIndex < 0) {
+        const tocHref = item.href.replace(/#.*$/, '')
+        let matchedIndex = resolvedSpine.findIndex(
+          (s) => s.href === tocHref || s.href === item.href
         )
+        if (matchedIndex < 0) {
+          const tocFile = tocHref.split('/').pop() || ''
+          matchedIndex = resolvedSpine.findIndex(
+            (s) => (s.href.split('/').pop() || '') === tocFile
+          )
+        }
+        // Fallback: use global TOC position (each item gets a unique index)
+        if (matchedIndex < 0) {
+          matchedIndex = Math.min(globalIdx, resolvedSpine.length - 1)
+        }
+        item.spineIndex = matchedIndex >= 0 ? matchedIndex : 0
       }
-      if (matchedIndex < 0) {
-        matchedIndex = Math.min(idx, resolvedSpine.length - 1)
-      }
-      item.spineIndex = matchedIndex >= 0 ? matchedIndex : 0
-
+      globalIdx++
       if (item.subitems) assignSpineIndex(item.subitems)
     }
   }

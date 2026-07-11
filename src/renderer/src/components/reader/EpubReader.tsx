@@ -10,11 +10,12 @@ interface Props {
   onProgress?: (chapterIndex: number, chapterCount: number, percent: number) => void
   onTocReady?: (toc: TocItem[]) => void
   initialChapterIndex?: number
+  initialProgress?: number
 }
 
 export type { TocItem }
 
-export default function EpubReader({ filePath, onClose, onProgress, onTocReady, initialChapterIndex }: Props) {
+export default function EpubReader({ filePath, onClose, onProgress, onTocReady, initialChapterIndex, initialProgress }: Props) {
   const { t } = useI18n()
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
@@ -78,15 +79,41 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
 
   // Restore reading position
   useEffect(() => {
-    if (!epubContent || !contentRef.current || hasRestoredRef.current) return
-    if (!initialChapterIndex || initialChapterIndex <= 0) return
+    if (!epubContent || hasRestoredRef.current) return
+
+    // Determine the target scroll position
+    const pct = initialProgress && initialProgress > 0 && initialProgress < 100 ? initialProgress : null
+    if (!initialChapterIndex && !pct) { hasRestoredRef.current = true; return }
 
     hasRestoredRef.current = true
-    requestAnimationFrame(() => {
-      const el = contentRef.current?.querySelector(`[data-chapter="${initialChapterIndex}"]`)
-      if (el) el.scrollIntoView({ block: 'start' })
-    })
-  }, [epubContent, initialChapterIndex])
+
+    const tryScroll = (attempts: number) => {
+      const container = contentRef.current
+      if (!container) { if (attempts < 10) setTimeout(() => tryScroll(attempts + 1), 200); return }
+
+      let targetTop: number | null = null
+
+      if (pct) {
+        // Percentage-based: accurate within ± several pages
+        const total = container.scrollHeight - container.clientHeight
+        if (total > 0) targetTop = Math.round((total * pct) / 100)
+      }
+
+      if (targetTop == null && initialChapterIndex && initialChapterIndex > 0) {
+        // Chapter-based fallback
+        const el = container.querySelector(`[data-chapter="${initialChapterIndex}"]`) as HTMLElement | null
+        if (!el) { if (attempts < 10) setTimeout(() => tryScroll(attempts + 1), 200); return }
+        const containerRect = container.getBoundingClientRect()
+        const elRect = el.getBoundingClientRect()
+        targetTop = container.scrollTop + (elRect.top - containerRect.top) - 80
+      }
+
+      if (targetTop != null) {
+        container.scrollTo({ top: targetTop, behavior: 'instant' })
+      }
+    }
+    setTimeout(() => tryScroll(0), 100)
+  }, [epubContent, initialChapterIndex, initialProgress])
 
   // Scroll progress tracking
   useEffect(() => {

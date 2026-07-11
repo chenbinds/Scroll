@@ -104,3 +104,47 @@
 - **主进程：** 新增 storage:get / storage:set IPC 处理器
 - **预加载：** 新增 storage API 暴露
 - **预置曲目：** 添加到 Pixabay CDN 链接
+
+---
+
+## 2026-07-11 — 阅读器核心功能修复（多轮迭代）
+
+### 问题
+
+1. EPUB TOC 点击无效（N 轮修复才找到根因）
+2. 页面滚动卡顿（虚拟章节架构问题）
+3. 阅读进度无法恢复
+4. 书签功能无效
+
+### 解决过程
+
+**第 1-4 轮：** 在虚拟章节框架内修复（全部失败）
+- 尝试 `IntersectionObserver` 优化、`useEffect` 导航、模块 ref 等
+- 根本问题：虚拟章节的占位符高度估算永远不准 + 激活逻辑不可靠
+
+**第 5 轮：** 废弃虚拟章节，全量渲染
+- 删除 `renderedChapters` / `ChapterPlaceholder` / `ChapterList` / scroll 激活
+- EpubReader 代码从 345 行减到 ~170 行
+- 滚动流畅问题解决
+
+**第 6-8 轮：** 修复 TOC 导航
+- 尝试 `useLayoutEffect` + 模块 ref → 时序空洞
+- 尝试 callback ref + Zustand `_readerEl` → 成功
+- 发现 `parseNcx` 正则无法处理嵌套 `<navPoint>` → 改 DOMParser 递归
+- 发现 fragment 锚点未支持 → 加 `querySelector('#' + fragment)`
+
+**第 9 轮：** 修复进度恢复
+- `scrollIntoView` 不可靠 → 改用百分比 `scrollTop` 计算
+- 增加重试机制应对 DOM 延迟布局
+
+### 新增架构决策
+
+见 `docs/02-architecture-decisions.md` ADR-006 至 ADR-010。
+
+### 当前状态
+
+- ✅ EPUB 阅读（全量渲染、树状 TOC、fragment 跳转、进度恢复）
+- ✅ TXT 阅读（全量渲染、正则分章、TOC、进度恢复）
+- ✅ PDF 阅读（pdf.js、页码进度）
+- ✅ 书签（持久化、点击跳转）
+- 📋 待做：阅读主题、封面、豆瓣评分、MOBI/AZW3

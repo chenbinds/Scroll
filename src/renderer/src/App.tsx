@@ -119,6 +119,7 @@ export default function App() {
       case 'EPUB':
         return <EpubReader filePath={currentBook.path} onClose={() => setCurrentView('library')}
           initialChapterIndex={currentBook.currentPage || 0}
+          initialProgress={currentBook.progress || undefined}
           onProgress={(chapterIndex, _count, progress) => {
             updateBookProgress(currentBook.id, progress, chapterIndex)
             useAppStore.getState().setReadingPosition({ chapter: String(chapterIndex), page: chapterIndex, percent: progress })

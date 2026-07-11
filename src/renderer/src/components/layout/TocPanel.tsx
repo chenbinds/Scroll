@@ -3,15 +3,15 @@ import { useI18n } from '../../lib/i18n'
 
 // Recursive TOC item renderer
 function TocItemRow({ item, depth, onClick }: {
-  item: { label: string; spineIndex: number; subitems?: { label: string; spineIndex: number; subitems?: any[] }[] }
+  item: { label: string; href: string; spineIndex: number; subitems?: any[] }
   depth: number
-  onClick: (idx: number) => void
+  onClick: (idx: number, href: string) => void
 }) {
   const padLeft = 16 + depth * 16
   return (
     <div>
       <button
-        onClick={() => onClick(item.spineIndex)}
+        onClick={() => onClick(item.spineIndex, item.href)}
         className="w-full text-left text-sm text-gray-600 dark:text-gray-400
                    hover:text-scroll-600 dark:hover:text-scroll-400
                    hover:bg-scroll-50 dark:hover:bg-scroll-900/20
@@ -20,7 +20,7 @@ function TocItemRow({ item, depth, onClick }: {
       >
         {item.label}
       </button>
-      {item.subitems?.map((sub, j) => (
+      {item.subitems?.map((sub: any, j: number) => (
         <TocItemRow key={j} item={sub} depth={depth + 1} onClick={onClick} />
       ))}
     </div>
@@ -31,14 +31,31 @@ export default function TocPanel() {
   const { t } = useI18n()
   const { currentBook, toc } = useAppStore()
 
-  const handleClick = (spineIndex: number) => {
+  const handleClick = (spineIndex: number, href: string) => {
     const readerEl = useAppStore.getState()._readerEl
     if (!readerEl) return
-    const target = readerEl.querySelector(`[data-chapter="${spineIndex}"]`)
+
+    // Find the chapter section
+    const chapter = readerEl.querySelector(`[data-chapter="${spineIndex}"]`)
       || readerEl.querySelector(`[data-id="chapter-${spineIndex}"]`)
+    if (!chapter) return
+
+    // Check for fragment anchor (e.g., href="text.xhtml#section1")
+    const fragment = href.includes('#') ? href.split('#')[1] : null
+    let target: HTMLElement | null = null
+    if (fragment) {
+      try {
+        target = chapter.querySelector(`#${CSS.escape(fragment)}`) as HTMLElement | null
+          || chapter.querySelector(`a[name="${CSS.escape(fragment)}"]`) as HTMLElement | null
+      } catch { /* invalid fragment */ }
+    }
+
     if (target) {
-      const offset = (target as HTMLElement).offsetTop - 40
-      readerEl.scrollTo({ top: offset, behavior: 'smooth' })
+      // Fragment target: center it in viewport so surrounding context (headings) is visible
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    } else {
+      // No fragment: scroll to chapter start
+      chapter.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }
 
