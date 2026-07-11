@@ -1,47 +1,26 @@
 import { useAppStore } from '../../stores/appStore'
 import { useI18n } from '../../lib/i18n'
+import { epubNavRef } from '../reader/EpubReader'
+import { txtNavRef } from '../reader/TxtReader'
 
 export default function TocPanel() {
   const { t } = useI18n()
   const { currentBook, toc } = useAppStore()
 
   const handleClick = (spineIndex: number) => {
-    // Direct call — bypasses useEffect/state cycle entirely
-    const navFn = useAppStore.getState()._navFn
-    if (navFn) {
-      navFn(spineIndex)
-    } else {
-      // Fallback: use the old state-based approach
-      useAppStore.getState().setNavigateToSpineIndex(spineIndex)
-    }
+    // Try EPUB nav first, then TXT nav
+    const navFn = epubNavRef.current || txtNavRef.current
+    if (navFn) navFn(spineIndex)
   }
 
   if (toc.length === 0) {
-    const isReader = useAppStore.getState().currentView === 'reader'
-    const format = useAppStore.getState().currentBook?.format?.toUpperCase()
-    const supportsToc = format === 'EPUB' || format === 'TXT' || format === 'MD' || format === 'MARKDOWN'
-
-    if (!isReader || !supportsToc) {
-      return (
-        <div className="p-4">
-          <p className="text-sm text-gray-400 dark:text-gray-500">
-            {t('reader.placeholder.epub')}
-          </p>
-        </div>
-      )
-    }
-
     return (
       <div className="p-4">
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-          {currentBook?.title || '...'}
-        </h3>
-        <div className="mt-4 space-y-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
-                 style={{ width: `${60 + Math.random() * 40}%`, marginLeft: i > 2 ? '16px' : '0' }} />
-          ))}
-        </div>
+        <p className="text-sm text-gray-400 dark:text-gray-500">
+          {currentBook
+            ? `${currentBook.title} — ${currentBook.format}`
+            : t('reader.placeholder.epub')}
+        </p>
       </div>
     )
   }

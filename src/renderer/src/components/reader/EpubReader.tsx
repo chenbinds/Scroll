@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import { parseEpub, type EpubContent, type TocItem } from '../../lib/epubParser'
 import { useAppStore } from '../../stores/appStore'
@@ -14,54 +14,40 @@ interface Props {
 
 export type { TocItem }
 
+// Module-level ref for TOC navigation (shared between reader and TocPanel)
+// useLayoutEffect sets it before paint — no timing hole, no React re-render cost
+export const epubNavRef: { current: ((index: number) => void) | null } = { current: null }
+
 export default function EpubReader({ filePath, onClose, onProgress, onTocReady, initialChapterIndex }: Props) {
   const { t } = useI18n()
   const [title, setTitle] = useState('')
+  const [author, setAuthor] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [fontSize, setFontSize] = useState(100)
   const [epubContent, setEpubContent] = useState<EpubContent | null>(null)
-  const [renderedChapters, setRenderedChapters] = useState<Set<number>>(new Set())
   const contentRef = useRef<HTMLDivElement>(null)
   const hasRestoredRef = useRef(false)
 
-  // ---- Direct-call nav function (registered in store, called by TocPanel) ----
-  // Uses epubContent from closure with [epubContent] dep — always current
-  const navToChapter = useCallback((targetIndex: number) => {
-    // epubContent is captured via [epubContent] dep — always current when called
-    if (!epubContent || !contentRef.current) return
+  // ---- Navigation: useLayoutEffect fires after DOM commit, BEFORE paint ----
+  // When TocPanel renders (same render cycle), user can't click until after paint
+  // So the nav function is always registered before the first possible click
+  const navFn = useCallback((index: number) => {
+    const el = contentRef.current?.querySelector(`[data-chapter="${index}"]`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
 
-    // Render target + broad surrounding range
-    setRenderedChapters((prev) => {
-      const next = new Set(prev)
-      let changed = false
-      for (let i = Math.max(0, targetIndex - 8); i <= Math.min(epubContent.spine.length - 1, targetIndex + 8); i++) {
-        if (!next.has(i)) { next.add(i); changed = true }
-      }
-      return changed ? next : prev
-    })
+  useLayoutEffect(() => {
+    epubNavRef.current = navFn
+    return () => { epubNavRef.current = null }
+  }, [navFn])
 
-    // Wait for React to flush, then scroll
-    let attempts = 0
-    const tryScroll = () => {
-      const el = contentRef.current?.querySelector(`[data-chapter="${targetIndex}"]`) as HTMLElement | null
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      } else {
-        attempts++
-        if (attempts < 30) setTimeout(tryScroll, 60)
-      }
-    }
-    requestAnimationFrame(() => setTimeout(tryScroll, 40))
-  }, [epubContent])
-
-  // Register nav function in store so TocPanel can call it directly
+  // Cleanup on unmount
   useEffect(() => {
-    if (epubContent) {
-      useAppStore.getState()._setNavFn(navToChapter)
+    return () => {
+      useAppStore.getState().setToc([])
     }
-    return () => { useAppStore.getState()._setNavFn(null) }
-  }, [navToChapter, epubContent])
+  }, [])
 
   // Load EPUB
   useEffect(() => {
@@ -69,9 +55,6 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
     setLoading(true)
     setError(null)
     hasRestoredRef.current = false
-    setRenderedChapters(new Set())
-
-    const startIdx = initialChapterIndex ?? 0
 
     const load = async () => {
       try {
@@ -82,16 +65,12 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
         if (cancelled) return
 
         setEpubContent(content)
+        epubRef.current = content
         setTitle(content.metadata.title)
+        setAuthor(content.metadata.author)
         onTocReady?.(content.toc)
 
-        // Render initial chapters
-        const initialSet = new Set<number>()
-        for (let i = Math.max(0, startIdx - 5); i <= Math.min(content.spine.length - 1, startIdx + 5); i++) {
-          initialSet.add(i)
-        }
-        setRenderedChapters(initialSet)
-
+        // AI context
         if (content.spine.length > 0) {
           const firstContent = content.files.get(content.spine[0].href)
           useAppStore.getState().setAiContext({
@@ -102,36 +81,26 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
         setLoading(false)
       } catch (err) {
         if (cancelled) return
-        console.error('[EpubReader] Parse error:', err)
         setError('Failed to load EPUB: ' + (err instanceof Error ? err.message : String(err)))
         setLoading(false)
       }
     }
 
     load()
-    return () => {
-      cancelled = true
-      useAppStore.getState().setToc([])
-    }
+    return () => { cancelled = true }
   }, [filePath])
 
-  // Restore reading position
+  // Restore reading position — chapters are already in DOM (full render), just scroll
   useEffect(() => {
     if (!epubContent || !contentRef.current || hasRestoredRef.current) return
     if (!initialChapterIndex || initialChapterIndex <= 0) return
 
     hasRestoredRef.current = true
-    let attempts = 0
-    let timer: ReturnType<typeof setTimeout>
-
-    const tryScroll = () => {
-      const target = contentRef.current?.querySelector(`[data-chapter="${initialChapterIndex}"]`) as HTMLElement | null
-      if (target) { target.scrollIntoView({ block: 'start' }); return }
-      attempts++
-      if (attempts < 30) timer = setTimeout(tryScroll, 200)
-    }
-    timer = setTimeout(tryScroll, 300)
-    return () => clearTimeout(timer)
+    // Small delay for layout to settle, then scroll
+    requestAnimationFrame(() => {
+      const el = contentRef.current?.querySelector(`[data-chapter="${initialChapterIndex}"]`)
+      if (el) el.scrollIntoView({ block: 'start' })
+    })
   }, [epubContent, initialChapterIndex])
 
   // Scroll progress tracking
@@ -140,9 +109,11 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
     const el = contentRef.current
     let ticking = false
 
-    const updateProgress = () => {
+    const update = () => {
       const total = el.scrollHeight - el.clientHeight
       const pct = total > 0 ? Math.round((el.scrollTop / total) * 100) : 0
+
+      // Find current chapter
       let currentIdx = 0
       const chapters = el.querySelectorAll('[data-chapter]')
       const containerRect = el.getBoundingClientRect()
@@ -156,59 +127,12 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
     }
 
     const onScroll = () => {
-      if (!ticking) { ticking = true; requestAnimationFrame(() => { updateProgress(); ticking = false }) }
+      if (!ticking) { ticking = true; requestAnimationFrame(() => { update(); ticking = false }) }
     }
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
   }, [epubContent, onProgress])
 
-  // ---- Scroll-based lazy activation (rAF only, NO time throttle) ----
-  useEffect(() => {
-    if (!contentRef.current || !epubContent) return
-    const el = contentRef.current
-    let ticking = false
-
-    const check = () => {
-      const buffer = el.clientHeight * 4 // 4x viewport — generous pre-load
-      const top = el.scrollTop - buffer
-      const bottom = el.scrollTop + el.clientHeight + buffer
-
-      const children = el.querySelectorAll('[data-chapter]')
-      const toActivate: number[] = []
-      children.forEach((child) => {
-        const i = Number((child as HTMLElement).dataset.chapter)
-        if (Number.isNaN(i)) return
-        const rect = child.getBoundingClientRect()
-        const containerRect = el.getBoundingClientRect()
-        const relTop = rect.top - containerRect.top
-        const relBottom = rect.bottom - containerRect.top
-        if (relBottom >= top && relTop <= bottom) toActivate.push(i)
-      })
-
-      if (toActivate.length > 0) {
-        setRenderedChapters((prev) => {
-          const next = new Set(prev)
-          let changed = false
-          for (const i of toActivate) { if (!next.has(i)) { next.add(i); changed = true } }
-          return changed ? next : prev
-        })
-      }
-      ticking = false
-    }
-
-    const onScroll = () => {
-      if (!ticking) { requestAnimationFrame(check); ticking = true }
-    }
-
-    // Also run periodically as a fallback (handles fast scrolling, layout shifts)
-    const interval = setInterval(check, 500)
-
-    check()
-    el.addEventListener('scroll', onScroll, { passive: true })
-    return () => { el.removeEventListener('scroll', onScroll); clearInterval(interval) }
-  }, [epubContent])
-
-  // Font size
   const increaseFont = useCallback(() => setFontSize((s) => Math.min(s + 10, 200)), [])
   const decreaseFont = useCallback(() => setFontSize((s) => Math.max(s - 10, 60)), [])
 
@@ -223,24 +147,6 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
     setNavigateToPercent(null)
   }, [navigateToPercent])
 
-  // Chapter content nodes
-  const chapterNodes = useMemo(() => {
-    if (!epubContent) return null
-    return epubContent.spine.map((item, i) => {
-      const isRendered = renderedChapters.has(i)
-      const html = epubContent.files.get(item.href)
-      return (
-        <section key={i} data-href={item.href} data-chapter={i} className="mb-8">
-          {isRendered && html ? (
-            <div dangerouslySetInnerHTML={{ __html: extractBody(html) }} />
-          ) : (
-            <ChapterPlaceholder html={html} />
-          )}
-        </section>
-      )
-    })
-  }, [epubContent, renderedChapters])
-
   // Keyboard
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -251,6 +157,24 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
   }, [])
+
+  // ---- RENDER ----
+
+  // Build all chapter sections upfront — no lazy rendering
+  const chapterElements = epubContent
+    ? epubContent.spine.map((item, i) => {
+        const html = epubContent.files.get(item.href)
+        return (
+          <section key={i} data-href={item.href} data-chapter={i} className="mb-8">
+            {html ? (
+              <div dangerouslySetInnerHTML={{ __html: extractBody(html) }} />
+            ) : (
+              <div className="text-sm text-gray-400 italic py-4">[Content unavailable]</div>
+            )}
+          </section>
+        )
+      })
+    : null
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-950">
@@ -275,7 +199,7 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
         </div>
       </div>
 
-      {/* Content */}
+      {/* Content — full render, no virtual scrolling */}
       <div ref={contentRef} className="flex-1 overflow-auto scrollbar-thin">
         {loading && (
           <div className="flex items-center justify-center h-full">
@@ -296,24 +220,19 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
           </div>
         )}
 
-        {!loading && !error && chapterNodes && (
+        {!loading && !error && chapterElements && (
           <div className="max-w-4xl mx-auto px-8 py-6 reader-content" style={{ fontSize: `${fontSize}%` }}>
-            <h1 className="text-2xl font-bold mb-8 text-center text-gray-900 dark:text-gray-100">{title}</h1>
-            {chapterNodes}
+            <h1 className="text-2xl font-bold mb-2 text-center text-gray-900 dark:text-gray-100">{title}</h1>
+            {author && author !== 'Unknown Author' && (
+              <p className="text-sm text-center text-gray-400 dark:text-gray-600 mb-8">{author}</p>
+            )}
+            <div className={author && author !== 'Unknown Author' ? '' : 'mt-6'}>
+              {chapterElements}
+            </div>
           </div>
         )}
       </div>
     </div>
-  )
-}
-
-// ---- Pure placeholder — zero JS overhead ----
-function ChapterPlaceholder({ html }: { html: string | undefined }) {
-  const estimatedLines = html ? Math.ceil(html.length / 80) : 20
-  const height = Math.max(estimatedLines * 28, 180)
-  return (
-    <div style={{ height: `${height}px` }}
-         className="bg-gray-50 dark:bg-gray-800/30 rounded" />
   )
 }
 

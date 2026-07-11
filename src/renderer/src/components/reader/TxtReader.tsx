@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import { parseTxt, type TxtChapter } from '../../lib/txtParser'
 import { useAppStore } from '../../stores/appStore'
@@ -11,6 +11,9 @@ interface Props {
   initialProgress?: number
 }
 
+// Module-level ref for TOC navigation
+export const txtNavRef: { current: ((index: number) => void) | null } = { current: null }
+
 export default function TxtReader({ filePath, onClose, onProgress, initialProgress }: Props) {
   const { t } = useI18n()
   const [chapters, setChapters] = useState<TxtChapter[]>([])
@@ -19,13 +22,28 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
   const [error, setError] = useState<string | null>(null)
   const [fontSize, setFontSize] = useState(100)
   const contentRef = useRef<HTMLDivElement>(null)
-  const restoreAttemptRef = useRef(0)
+  const hasRestoredRef = useRef(false)
+
+  const navFn = useCallback((index: number) => {
+    const el = contentRef.current?.querySelector(`[data-id="chapter-${index}"]`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
+
+  useLayoutEffect(() => {
+    txtNavRef.current = navFn
+    return () => { txtNavRef.current = null }
+  }, [navFn])
+
+  useEffect(() => {
+    return () => { useAppStore.getState().setToc([]) }
+  }, [])
 
   // Load TXT
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
+    hasRestoredRef.current = false
 
     const load = async () => {
       try {
@@ -41,14 +59,14 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
         setTitle(fileName)
         setChapters(parsed)
 
-        // Push TOC to sidebar
-        const toc = parsed.map((ch, i) => ({
+        // TOC to sidebar
+        useAppStore.getState().setToc(parsed.map((ch, i) => ({
           label: ch.title,
           href: `chapter-${i}`,
           spineIndex: i
-        }))
-        useAppStore.getState().setToc(toc)
-        // Push first chapter to AI context
+        })))
+
+        // AI context
         if (parsed.length > 0) {
           useAppStore.getState().setAiContext({
             chapter: parsed[0].title,
@@ -64,37 +82,21 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
       }
     }
     load()
-    return () => {
-      cancelled = true
-      // Clear TOC when reader unmounts
-      useAppStore.getState().setToc([])
-    }
+    return () => { cancelled = true }
   }, [filePath])
 
-  // Restore reading position — retry until content height is meaningful
+  // Restore reading position
   useEffect(() => {
-    if (chapters.length === 0 || !contentRef.current) return
+    if (chapters.length === 0 || !contentRef.current || hasRestoredRef.current) return
     if (!initialProgress || initialProgress <= 0 || initialProgress >= 100) return
 
-    restoreAttemptRef.current = 0
-    let timer: ReturnType<typeof setTimeout>
-
-    const tryRestore = () => {
+    hasRestoredRef.current = true
+    requestAnimationFrame(() => {
       const el = contentRef.current
       if (!el) return
       const total = el.scrollHeight - el.clientHeight
-      if (total > 500) {
-        el.scrollTop = Math.round((total * initialProgress) / 100)
-        return
-      }
-      restoreAttemptRef.current++
-      if (restoreAttemptRef.current < 30) {
-        timer = setTimeout(tryRestore, 200)
-      }
-    }
-
-    timer = setTimeout(tryRestore, 400)
-    return () => clearTimeout(timer)
+      if (total > 0) el.scrollTop = Math.round((total * initialProgress) / 100)
+    })
   }, [chapters, initialProgress])
 
   // Scroll progress
@@ -102,7 +104,6 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
     if (!contentRef.current || loading) return
     const el = contentRef.current
     let ticking = false
-    let lastUpdate = 0
 
     const update = () => {
       const total = el.scrollHeight - el.clientHeight
@@ -111,48 +112,23 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
     }
 
     const onScroll = () => {
-      if (!ticking) {
-        ticking = true
-        requestAnimationFrame(() => {
-          const now = Date.now()
-          if (now - lastUpdate >= 500) {
-            lastUpdate = now
-            update()
-          }
-          ticking = false
-        })
-      }
+      if (!ticking) { ticking = true; requestAnimationFrame(() => { update(); ticking = false }) }
     }
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
   }, [loading, chapters, onProgress])
 
-  // Font size
   const increaseFont = useCallback(() => setFontSize((s) => Math.min(s + 10, 200)), [])
   const decreaseFont = useCallback(() => setFontSize((s) => Math.max(s - 10, 60)), [])
 
-  // TOC navigation — spineIndex directly from TocPanel
-  const { navigateToSpineIndex, setNavigateToSpineIndex } = useAppStore()
-  useEffect(() => {
-    if (navigateToSpineIndex === null || !contentRef.current) return
-
-    const el = contentRef.current.querySelector(`[data-id="chapter-${navigateToSpineIndex}"]`)
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
-    setNavigateToSpineIndex(null)
-  }, [navigateToSpineIndex])
-
-  // Bookmark navigation: scroll to percentage position
-  const { navigateToPercent, setNavigateToPercent } = useAppStore()
+  // Bookmark navigation
+  const navigateToPercent = useAppStore((s) => s.navigateToPercent)
+  const setNavigateToPercent = useAppStore((s) => s.setNavigateToPercent)
   useEffect(() => {
     if (navigateToPercent === null || !contentRef.current) return
-
     const el = contentRef.current
     const total = el.scrollHeight - el.clientHeight
-    if (total > 0) {
-      el.scrollTop = Math.round((total * navigateToPercent) / 100)
-    }
+    if (total > 0) el.scrollTop = Math.round((total * navigateToPercent) / 100)
     setNavigateToPercent(null)
   }, [navigateToPercent])
 
@@ -207,7 +183,7 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
             {chapters.map((ch, i) => (
               <section key={i} data-id={`chapter-${i}`} className="mb-8">
                 {chapters.length > 1 && (
-                  <h2 className="!font-bold !text-lg mb-4 text-gray-900 dark:text-gray-100">{ch.title}</h2>
+                  <h2 className="font-bold text-lg mb-4 text-gray-900 dark:text-gray-100">{ch.title}</h2>
                 )}
                 {ch.content.split('\n').map((para, j) =>
                   para.trim() ? <p key={j}>{para}</p> : <br key={j} />

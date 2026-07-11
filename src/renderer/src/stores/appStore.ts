@@ -62,9 +62,8 @@ interface AppState {
   setNavigateToHref: (href: string | null) => void
   navigateToSpineIndex: number | null
   setNavigateToSpineIndex: (idx: number | null) => void
-  // Direct-call navigation (bypasses useEffect for reliability)
-  _navFn: ((index: number) => void) | null
-  _setNavFn: (fn: ((index: number) => void) | null) => void
+  // TOC nav refs are module-level exports from EpubReader/TxtReader
+  // (useLayoutEffect sets them before paint — no timing hole)
 
   // Bookmarks
   bookmarks: { label: string; href?: string; page?: number; percent?: number; time: number }[]
@@ -136,8 +135,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setNavigateToHref: (href) => set({ navigateToHref: href }),
   navigateToSpineIndex: null,
   setNavigateToSpineIndex: (idx) => set({ navigateToSpineIndex: idx }),
-  _navFn: null,
-  _setNavFn: (fn) => set({ _navFn: fn }),
+
 
   bookmarks: [],
   addBookmark: (bm) => set((s) => ({ bookmarks: [...s.bookmarks, bm] })),
