@@ -1,0 +1,124 @@
+import { Book, Moon, Sun, Settings, Bookmark, MessageCircle, FileText, Music } from 'lucide-react'
+import { useAppStore } from '../../stores/appStore'
+import { useMusicStore } from '../../stores/musicStore'
+import { useI18n } from '../../lib/i18n'
+
+interface Props {
+  onOpenSettings: () => void
+}
+
+export default function TopBar({ onOpenSettings }: Props) {
+  const { t } = useI18n()
+  const {
+    currentView, darkMode, toggleDarkMode, currentBook, setCurrentView,
+    leftSidebarOpen, leftSidebarTab, toggleLeftSidebar,
+    rightSidebarOpen, toggleRightSidebar
+  } = useAppStore()
+  const { isExpanded, setExpanded, setShowMiniPlayer, isPlaying } = useMusicStore()
+
+  return (
+    <header className="h-12 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 no-select bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm">
+      <div className="flex items-center gap-3">
+        {currentView === 'reader' && (
+          <button
+            onClick={() => setCurrentView('library')}
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+          >
+            <Book size={16} />
+            <span>{t('app.backToLibrary')}</span>
+          </button>
+        )}
+
+        {currentView === 'library' && (
+          <h1 className="text-base font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+            <Book size={18} className="text-scroll-500" />
+            {t('app.title')}
+          </h1>
+        )}
+
+        {currentView === 'reader' && currentBook && (
+          <span className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[400px]">
+            {currentBook.title}
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center gap-1">
+        {currentView === 'reader' && (
+          <>
+            {/* Left sidebar toggles: TOC + Bookmarks */}
+            <button
+              onClick={() => toggleLeftSidebar('toc')}
+              className={`p-2 rounded-md transition-colors ${
+                leftSidebarOpen && leftSidebarTab === 'toc'
+                  ? 'bg-scroll-100 dark:bg-scroll-900 text-scroll-600'
+                  : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+              title={t('app.toc')}
+            >
+              <FileText size={18} />
+            </button>
+            <button
+              onClick={() => toggleLeftSidebar('bookmarks')}
+              className={`p-2 rounded-md transition-colors ${
+                leftSidebarOpen && leftSidebarTab === 'bookmarks'
+                  ? 'bg-scroll-100 dark:bg-scroll-900 text-scroll-600'
+                  : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+              title={t('app.bookmarks')}
+            >
+              <Bookmark size={18} />
+            </button>
+
+            <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
+
+            {/* Right sidebar toggle: AI */}
+            <button
+              onClick={toggleRightSidebar}
+              className={`p-2 rounded-md transition-colors ${
+                rightSidebarOpen
+                  ? 'bg-scroll-100 dark:bg-scroll-900 text-scroll-600'
+                  : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+              title={t('app.ai')}
+            >
+              <MessageCircle size={18} />
+            </button>
+            <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-2" />
+          </>
+        )}
+
+        <button
+          onClick={() => {
+            if (isExpanded) setExpanded(false)
+            else { setShowMiniPlayer(true); setExpanded(true) }
+          }}
+          className={`p-2 rounded-md transition-colors ${
+            isPlaying ? 'text-scroll-500'
+              : isExpanded ? 'bg-scroll-100 dark:bg-scroll-900 text-scroll-600'
+              : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'
+          }`}
+          title={t('app.music')}
+        >
+          <Music size={18} />
+        </button>
+
+        <button
+          onClick={toggleDarkMode}
+          className="p-2 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          title={darkMode ? t('app.theme.light') : t('app.theme.dark')}
+        >
+          {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
+
+        <button
+          onClick={onOpenSettings}
+          className="p-2 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          title={t('app.settings') + ' (Ctrl+Shift+S)'}
+        >
+          <Settings size={18} />
+        </button>
+      </div>
+    </header>
+  )
+}

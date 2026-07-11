@@ -1,0 +1,41 @@
+{
+  "name": "scroll-ebook-reader",
+  "version": "0.1.0",
+  "description": "卷轴 - AI 增强的本地电子书阅读器",
+  "main": "./out/main/index.js",
+  "author": "Brandon Chen",
+  "license": "MIT",
+  "homepage": "https://github.com/brandonchen/scroll-ebook-reader",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "package": "electron-vite build && electron-builder --win",
+    "package:portable": "electron-vite build && electron-builder --win portable",
+    "lint": "eslint . --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "epubjs": "^0.3.93",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.400.0",
+    "pdfjs-dist": "^4.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^4.5.0"
+  },
+  "devDependencies": {
+    "@electron-toolkit/preload": "^3.0.0",
+    "@electron-toolkit/utils": "^3.0.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "autoprefixer": "^10.4.0",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.0",
+    "electron-vite": "^2.3.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.5.0"
+  }
+}

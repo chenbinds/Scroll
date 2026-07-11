@@ -1,0 +1,2 @@
+<!-- 卷轴 Scroll - AI 增强电子书阅读器 -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.openai.com https://api.deepseek.com https://dashscope.aliyuncs.com https://api.moonshot.cn https://api.baichuan-ai.com https://api.zhipuai.cn https://api.siliconflow.cn">
