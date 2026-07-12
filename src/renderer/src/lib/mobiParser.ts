@@ -404,19 +404,40 @@ export async function parseMobi(base64Data: string): Promise<MobiContent> {
         headingMatches.push({ pos: m.index, heading: h })
     }
   }
+  // Pattern 4 (fallback): chapter titles from <a filepos=XXXXX>Title</a>
+  // Use filepos value as split position (points to actual content, not TOC location)
+  if (headingMatches.length === 0) {
+    const aPattern = /<a\s+filepos=(\d+)>([^<]{2,80})<\/a>/gi
+    const seen = new Set<string>()
+    while ((m = aPattern.exec(html)) !== null) {
+      const filepos = parseInt(m[1], 10)
+      const h = m[2].trim()
+      if (h && h.length >= 4 && !seen.has(h) && !/^[0-9\s]+$/.test(h)
+          && !/table of contents/i.test(h) && !/^contents$/i.test(h)
+          && !/titlepage/i.test(h) && !/start/i.test(h)) {
+        seen.add(h)
+        headingMatches.push({ pos: filepos, heading: h })
+      }
+    }
+    // Sort by filepos (content position)
+    headingMatches.sort((a, b) => a.pos - b.pos)
+  }
+
+  // Strip font size attributes from EVERY chapter's HTML so CSS scaling works
+  const stripFontSize = (s: string) => s.replace(/<font[^>]*>/gi, (tag) => tag.replace(/\s*size\s*=\s*["'][^"']*["']/gi, '').replace(/\s*size\s*=\s*\d+/gi, ''))
+
   if (headingMatches.length > 0) {
     for (let i = 0; i < headingMatches.length; i++) {
       const start = headingMatches[i].pos, end = i + 1 < headingMatches.length ? headingMatches[i + 1].pos : html.length
       let chunk = html.slice(start, end).replace(/<h[1-3][^>]*>[\s\S]*?<\/h[1-3]>/i, '')
-      chapters.push({ title: headingMatches[i].heading, html: chunk })
+      chapters.push({ title: headingMatches[i].heading, html: stripFontSize(chunk) })
     }
   } else {
-    chapters.push({ title, html })
+    chapters.push({ title, html: stripFontSize(html) })
   }
 
-  // Strip font size attributes so CSS font-size scaling works
-  // MUST run AFTER heading detection (which relies on size attr)
-  html = html.replace(/<font[^>]*>/gi, (tag) => tag.replace(/\s*size\s*=\s*["'][^"']*["']/gi, '').replace(/\s*size\s*=\s*\d+/gi, ''))
+  // Also strip from main html variable (for any remaining downstream use)
+  html = stripFontSize(html)
   // Remove fixed width/height that interfere with layout
   html = html.replace(/\s+width\s*=\s*["']0pt["']/gi, '')
   html = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<mbp:pagebreak[^>]*\/?>/gi, '').replace(/<a[^>]*filepos=\d+[^>]*>[\s\S]*?<\/a>/gi, '').replace(/<a[^>]*>\s*<\/a>/gi, '').replace(/�/g, '').trim()
