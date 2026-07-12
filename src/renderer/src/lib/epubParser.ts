@@ -98,7 +98,7 @@ export async function parseEpub(base64Data: string): Promise<EpubContent> {
   const opfXml = await opfFile.async('text')
   const opfDir = opfPath.includes('/') ? opfPath.substring(0, opfPath.lastIndexOf('/') + 1) : ''
 
-  const { metadata, manifest, spine } = parseOpf(opfXml, opfDir)
+  const { metadata, manifest, spine, cov } = parseOpf(opfXml, opfDir)
 
   const resolvedSpine = spine.map((s) => ({
     id: s.id,
@@ -197,7 +197,6 @@ export async function parseEpub(base64Data: string): Promise<EpubContent> {
 
   // Extract cover image
   let coverUrl: string | undefined
-  const { cov } = opf
   if (cov?.href) {
     const key = resolveRelative(opfDir, cov.href)
     if (imageDataUrls.has(key)) coverUrl = imageDataUrls.get(key)
