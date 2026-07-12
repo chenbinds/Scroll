@@ -8,7 +8,7 @@ export default function RightSidebar() {
   const { toggleRightSidebar } = useAppStore()
 
   return (
-    <aside className="w-80 border-l border-gray-200 dark:border-gray-800 flex flex-col bg-[var(--reader-bg)] overflow-hidden flex-shrink-0">
+    <aside className="w-80 border-l border-gray-200 dark:border-gray-800 flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden flex-shrink-0">
       <div className="h-10 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-3">
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
           <MessageCircle size={14} className="text-scroll-500" />
