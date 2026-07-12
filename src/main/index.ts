@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, net } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 
@@ -163,20 +163,31 @@ ipcMain.handle('file:readPath', async (_event, filePath: string) => {
   } catch { return null }
 })
 
-// Douban search proxy: fetch via session (has browser TLS fingerprint)
+// Douban search proxy — uses Node.js https (reliable, bypasses Electron net.fetch issues)
 ipcMain.handle('douban:search', async (_event, title: string, author?: string) => {
   try {
     const query = encodeURIComponent(author ? `${title} ${author}` : title)
-    const url = `https://book.douban.com/subject_search?search_text=${query}`
-    // Use session.defaultSession.fetch for browser-like behavior
-    const resp = await net.fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'zh-CN,zh;q=0.9',
-      },
+    const html = await new Promise<string>((resolve, reject) => {
+      const httpMod = require('https') as typeof import('https')
+      const req = httpMod.get(
+        `https://book.douban.com/subject_search?search_text=${query}`,
+        {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml',
+            'Accept-Language': 'zh-CN,zh;q=0.9',
+          },
+        },
+        (res) => {
+          if (res.statusCode !== 200) { let d = ''; res.on('data', (c: string) => d += c); res.on('end', () => reject(new Error(`HTTP ${res.statusCode}: ${d.slice(0, 200)}`))); return }
+          let data = ''
+          res.on('data', (chunk: string) => data += chunk)
+          res.on('end', () => resolve(data))
+        }
+      )
+      req.on('error', reject)
+      req.setTimeout(15000, () => { req.destroy(); reject(new Error('timeout')) })
     })
-    const html = await resp.text()
     // Find rating blocks and extract nearby title + url
     const ratingRe = /"rating":\s*\{"count":\s*\d+,\s*"rating_info":\s*"[^"]*",\s*"star_count":\s*[\d.]+,\s*"value":\s*([\d.]+)\}/g
     let rm: RegExpExecArray | null
