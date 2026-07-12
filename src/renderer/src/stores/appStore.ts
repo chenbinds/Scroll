@@ -32,6 +32,14 @@ interface AppState {
   setDarkMode: (dark: boolean) => void
   toggleDarkMode: () => void
 
+  // Reading theme (background + text color)
+  readingTheme: 'light' | 'paper' | 'eyeCare' | 'dark' | 'nature'
+  setReadingTheme: (theme: AppState['readingTheme']) => void
+
+  // Reading font family
+  readingFont: 'system' | 'serif' | 'sans'
+  setReadingFont: (font: AppState['readingFont']) => void
+
   // Current book
   currentBook: Book | null
   openBook: (book: Book) => void
@@ -97,6 +105,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   darkMode: true,
   setDarkMode: (dark) => set({ darkMode: dark }),
   toggleDarkMode: () => set((s) => ({ darkMode: !s.darkMode })),
+
+  readingTheme: 'light',
+  setReadingTheme: (theme) => set({ readingTheme: theme }),
+
+  readingFont: 'system',
+  setReadingFont: (font) => set({ readingFont: font }),
 
   currentBook: null,
   openBook: (book) => set({ currentBook: book, currentView: 'reader' }),

@@ -77,6 +77,20 @@ export default function App() {
     window.scrollAPI.storage.set('darkMode', darkMode).catch(() => {})
   }, [darkMode])
 
+  // Persist readingTheme
+  useEffect(() => {
+    window.scrollAPI.storage.get('readingTheme', 'light').then((saved: unknown) => {
+      if (typeof saved === 'string') useAppStore.getState().setReadingTheme(saved as any)
+    }).catch(() => {})
+  }, [])
+  const { readingTheme, readingFont } = useAppStore()
+  useEffect(() => {
+    window.scrollAPI.storage.set('readingTheme', readingTheme).catch(() => {})
+  }, [readingTheme])
+  useEffect(() => {
+    window.scrollAPI.storage.set('readingFont', readingFont).catch(() => {})
+  }, [readingFont])
+
   // Load AI config
   useEffect(() => {
     window.scrollAPI.storage.get('aiConfig', null).then((saved: unknown) => {
