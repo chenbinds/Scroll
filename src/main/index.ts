@@ -132,14 +132,16 @@ import { existsSync } from 'fs'
 
 // MOBI/AZW3 → EPUB conversion via Calibre's ebook-convert
 ipcMain.handle('mobi:convert', async (_event, filePath: string) => {
+  // Priority: 1) bundled portable, 2) system install, 3) PATH
   const candidates = [
-    'ebook-convert',
+    join(__dirname, '../../tools/calibre-portable/Calibre/ebook-convert.exe'),
     'C:/Program Files/Calibre2/ebook-convert.exe',
     'C:/Program Files (x86)/Calibre2/ebook-convert.exe',
+    'ebook-convert',
   ]
   let converter = ''
   for (const c of candidates) {
-    if (existsSync(c) || c === 'ebook-convert') { converter = c; break }
+    if (existsSync(c)) { converter = c; break }
   }
   if (!converter) return null
 

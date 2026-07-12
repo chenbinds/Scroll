@@ -67,3 +67,5 @@ yarn-debug.log*
 yarn-error.log*
 tmp/
 temp/
+tools/
+calibre-portable/

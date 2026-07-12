@@ -7,6 +7,9 @@ files:
   - out/**/*
   - "!node_modules/**/*"
   - node_modules/pdfjs-dist/**/*
+extraResources:
+  - from: tools/
+    to: tools/
 win:
   target:
     - target: portable
