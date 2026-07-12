@@ -14,7 +14,7 @@ export default function AppShell({ children, onOpenSettings }: Props) {
   const { leftSidebarOpen, rightSidebarOpen, currentView } = useAppStore()
 
   return (
-    <div className="h-screen flex flex-col bg-white dark:bg-gray-950 transition-colors">
+    <div className="h-screen flex flex-col bg-[var(--reader-bg)] transition-colors">
       <TopBar onOpenSettings={onOpenSettings} />
 
       <div className="flex-1 flex overflow-hidden">

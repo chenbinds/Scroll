@@ -16,7 +16,7 @@ export default function LeftSidebar() {
           onClick={() => toggleLeftSidebar('toc')}
           className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors ${
             leftSidebarTab === 'toc'
-              ? 'text-scroll-600 dark:text-scroll-400 border-b-2 border-scroll-500 bg-white dark:bg-gray-900'
+              ? 'text-scroll-600 dark:text-scroll-400 border-b-2 border-scroll-500 bg-[var(--reader-bg)]'
               : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
           }`}
         >
@@ -27,7 +27,7 @@ export default function LeftSidebar() {
           onClick={() => toggleLeftSidebar('bookmarks')}
           className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors ${
             leftSidebarTab === 'bookmarks'
-              ? 'text-scroll-600 dark:text-scroll-400 border-b-2 border-scroll-500 bg-white dark:bg-gray-900'
+              ? 'text-scroll-600 dark:text-scroll-400 border-b-2 border-scroll-500 bg-[var(--reader-bg)]'
               : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
           }`}
         >
