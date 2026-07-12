@@ -138,8 +138,8 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
   }, [])
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-gray-950">
-      <div className="h-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800
+    <div className="h-full flex flex-col bg-[var(--reader-bg)]">
+      <div className="h-10 bg-[var(--reader-bg)] border-b border-gray-200 dark:border-gray-800
                       flex items-center justify-between px-3 no-select flex-shrink-0">
         <button onClick={onClose} className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
           ← {t('app.backToLibrary')}

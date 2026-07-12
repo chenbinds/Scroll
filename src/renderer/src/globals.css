@@ -7,6 +7,8 @@
    ============================================================ */
 
 :root {
+  --reader-bg: #FFFFFF;
+  --reader-text: #333333;
   --reader-font: Cambria, 'Microsoft YaHei', Georgia, 'Times New Roman', serif;
   --ui-font: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
 }
