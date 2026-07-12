@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('scrollAPI', {
   openBookDialog: () => ipcRenderer.invoke('dialog:openBook'),
   openMusicDialog: () => ipcRenderer.invoke('dialog:openMusic'),
   readFile: (filePath: string) => ipcRenderer.invoke('file:read', filePath),
+  readPath: (filePath: string) => ipcRenderer.invoke('file:readPath', filePath),
 
   // 窗口控制
   getDataPath: () => ipcRenderer.invoke('app:getDataPath'),

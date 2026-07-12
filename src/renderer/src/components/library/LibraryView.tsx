@@ -37,17 +37,31 @@ export default function LibraryView() {
 
       addBook(book)
 
-      // Async: extract EPUB cover in background
-      if (ext.toUpperCase() === 'EPUB') {
-        window.scrollAPI.readFile(path).then((base64) => {
+      // Async: extract cover in background (EPUB + MOBI via Calibre)
+      const fmt = ext.toUpperCase()
+      if (fmt === 'EPUB') {
+        window.scrollAPI.readPath(path).then((base64) => {
           extractEpubCover(base64).then((coverUrl) => {
-            if (coverUrl) {
-              useAppStore.getState().setBooks(
-                useAppStore.getState().books.map((b) => b.id === book.id ? { ...b, coverUrl } : b)
-              )
-            }
+            if (coverUrl) updateBookCover(book.id, coverUrl)
           }).catch(() => {})
         }).catch(() => {})
+      } else if (fmt === 'MOBI' || fmt === 'AZW' || fmt === 'AZW3') {
+        // Try Calibre conversion, then extract EPUB cover
+        window.scrollAPI.convertMobi(path).then((epubPath: string | null) => {
+          if (epubPath) {
+            window.scrollAPI.readPath(epubPath).then((base64) => {
+              extractEpubCover(base64).then((coverUrl) => {
+                if (coverUrl) updateBookCover(book.id, coverUrl)
+              }).catch(() => {})
+            }).catch(() => {})
+          }
+        }).catch(() => {})
+      }
+
+      function updateBookCover(id: string, coverUrl: string) {
+        useAppStore.getState().setBooks(
+          useAppStore.getState().books.map((b) => b.id === id ? { ...b, coverUrl } : b)
+        )
       }
     }
   }, [addBook, t])

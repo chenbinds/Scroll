@@ -155,6 +155,14 @@ ipcMain.handle('mobi:convert', async (_event, filePath: string) => {
   })
 })
 
+// Read file by local path (for cover extraction etc.)
+ipcMain.handle('file:readPath', async (_event, filePath: string) => {
+  try {
+    const buf = readFileSync(filePath)
+    return buf.toString('base64')
+  } catch { return null }
+})
+
 // Douban search: fetch rating/summary for a book
 ipcMain.handle('douban:search', async (_event, title: string, author?: string) => {
   try {
