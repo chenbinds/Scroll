@@ -100,10 +100,20 @@ MOBI/AZW3 文件
 - Koodo 移植版花费十几次 commit 仍只有 90-95% 正确率
 - Calibre `ebook-convert` 一行命令解决所有问题
 
-## 待实现功能（按优先级）
+## 已完成功能（2026-07-12）
 
-1. 阅读主题系统（亮/纸/护眼/暗/自然 + 字体选择）
-2. 书籍封面提取
-3. 豆瓣评分集成
-4. CBR 漫画完善
-5. DJVU 支持
+1. ✅ EPUB/TXT/PDF/CBZ 阅读器
+2. ✅ MOBI/AZW3：Calibre `ebook-convert` 转 EPUB（完美）+ 内置解析器回退
+3. ✅ 暗色/亮色模式、书签、AI 聊天、音乐播放
+4. ✅ **阅读主题**：5 色背景 + 3 种字体（仅内容区），CSS 变量方案
+5. ✅ **EPUB/MOBI 封面提取**：EPUB 直接提取，MOBI 转 EPUB 后提取，PDF 首页缩略图
+6. ✅ **豆瓣评分**：Node.js https 请求 → 解析内嵌 JSON → 书架封面显示 ⭐ 评分
+7. ✅ **角标图片修复**：`max-height: 1.4em` 限制小图尺寸
+8. ✅ Calibre Portable 便携打包方案（`setup_calibre.bat` + `build.bat`）
+
+## 待实现功能
+
+1. 豆瓣评分调试（当前 Node.js https 请求可能被豆瓣限流，需进一步测试）
+2. DJVU 阅读器
+3. 字体缩放全局持久化（目前每个 reader 独立 fontSize）
+4. CBR 漫画完善（低优先级）
