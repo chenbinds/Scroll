@@ -321,6 +321,8 @@ export async function parseMobi(base64Data: string): Promise<MobiContent> {
       } catch (_) {}
     }
     if (!imgData) return fullMatch.replace(/recindex="\d+"/i, '')
+    // Skip very large images (>128KB raw) to avoid bloating HTML
+    if (imgData.length > 131072) return fullMatch.replace(/recindex="\d+"/i, '')
     let mime = 'image/jpeg'
     if (imgData[0] === 0x89 && imgData[1] === 0x50) mime = 'image/png'
     else if (imgData[0] === 0x47 && imgData[1] === 0x49) mime = 'image/gif'
@@ -329,7 +331,6 @@ export async function parseMobi(base64Data: string): Promise<MobiContent> {
     for (let bi = 0; bi < imgData.length; bi++) binary += String.fromCharCode(imgData[bi])
     const result = `src="data:${mime};base64,${btoa(binary)}"`
     seenImages.set(numStr, result)
-    // Reconstruct <img> tag with src attribute
     const cleaned = rest.replace(/recindex="\d+"/i, '').replace(/\s{2,}/g, ' ')
     return `<img ${result}${cleaned}>`
   })
@@ -342,7 +343,7 @@ export async function parseMobi(base64Data: string): Promise<MobiContent> {
     const recIdx = rs + idx
     try {
       const imgData = readRecord(recIdx)
-      if (imgData.length > 2 && ((imgData[0] === 0xFF && imgData[1] === 0xD8) || (imgData[0] === 0x89 && imgData[1] === 0x50))) {
+      if (imgData.length > 2 && imgData.length <= 131072 && ((imgData[0] === 0xFF && imgData[1] === 0xD8) || (imgData[0] === 0x89 && imgData[1] === 0x50))) {
         let mime = imgData[0] === 0x89 ? 'image/png' : 'image/jpeg'
         let binary = ''
         for (let bi = 0; bi < imgData.length; bi++) binary += String.fromCharCode(imgData[bi])
