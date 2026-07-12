@@ -173,31 +173,30 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
   }, [chapters])
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-gray-950">
+    <div className="h-full flex flex-col" style={{ backgroundColor: themeStyle.backgroundColor }}>
       {/* Toolbar */}
-      <div className="h-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800
-                      flex items-center justify-between px-3 no-select flex-shrink-0">
+      <div className="h-10 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-3 no-select flex-shrink-0" style={{ backgroundColor: themeStyle.backgroundColor }}>
         <button onClick={onClose}
-          className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+          className="text-sm transition-colors" style={{ color: themeStyle.color, opacity: 0.7 }}>
           ← {t('app.backToLibrary')}
         </button>
-        <span className="text-xs text-gray-400 truncate max-w-[300px]">{title}</span>
+        <span className="text-xs truncate max-w-[300px]" style={{ color: themeStyle.color, opacity: 0.5 }}>{title}</span>
 	        <ReaderThemeBar />
         <div className="flex items-center gap-3">
           <button onClick={decreaseFont}
-            className="p-1 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+            className="p-1 transition-colors" style={{ color: themeStyle.color, opacity: 0.6 }}>
             <ZoomOut size={16} />
           </button>
           <span className="text-xs text-gray-400 tabular-nums w-10 text-center">{fontSize}%</span>
           <button onClick={increaseFont}
-            className="p-1 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+            className="p-1 transition-colors" style={{ color: themeStyle.color, opacity: 0.6 }}>
             <ZoomIn size={16} />
           </button>
         </div>
       </div>
 
       {/* Content */}
-      <div ref={setContentRef} className="flex-1 overflow-auto scrollbar-thin">
+      <div ref={setContentRef} className="flex-1 overflow-auto scrollbar-thin" style={{ backgroundColor: themeStyle.backgroundColor }}>
         {loading && (
           <div className="flex items-center justify-center h-full">
             <div className="flex gap-1.5">

@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
+import ReaderThemeBar from './ReaderThemeBar'
+import { getThemeStyle } from '../../lib/readingTheme'
 import { useI18n } from '../../lib/i18n'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -19,6 +21,9 @@ interface Props {
 
 export default function PdfReader({ filePath, onClose, onPageChange, initialPage }: Props) {
   const { t } = useI18n()
+  const readingTheme = useAppStore((s) => s.readingTheme)
+  const readingFont = useAppStore((s) => s.readingFont)
+  const themeStyle = getThemeStyle(readingTheme, readingFont)
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null)
   const [pageCount, setPageCount] = useState(0)
   const [scale, setScale] = useState(1.5)
@@ -212,25 +217,25 @@ export default function PdfReader({ filePath, onClose, onPageChange, initialPage
   const zoomOut = useCallback(() => setScale((s) => Math.round(Math.max(s - 0.25, 0.5) * 100) / 100), [])
 
   return (
-    <div className="h-full flex flex-col bg-gray-100 dark:bg-gray-950">
+    <div className="h-full flex flex-col" style={{ backgroundColor: themeStyle.backgroundColor }}>
       {/* Top toolbar */}
-      <div className="h-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800
-                      flex items-center justify-between px-3 no-select flex-shrink-0">
+      <div className="h-10 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-3 no-select flex-shrink-0" style={{ backgroundColor: themeStyle.backgroundColor }}>
         <button onClick={onClose}
-          className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+          className="text-sm transition-colors" style={{ color: themeStyle.color, opacity: 0.7 }}>
           ← {t('app.backToLibrary')}
         </button>
 
         <div className="flex items-center gap-3">
+          <ReaderThemeBar />
           <button onClick={zoomOut}
-            className="p-1 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+            className="p-1 transition-colors" style={{ color: themeStyle.color, opacity: 0.6 }}>
             <ZoomOut size={16} />
           </button>
           <span className="text-xs text-gray-400 tabular-nums w-10 text-center">
             {Math.round(scale * 100)}%
           </span>
           <button onClick={zoomIn}
-            className="p-1 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+            className="p-1 transition-colors" style={{ color: themeStyle.color, opacity: 0.6 }}>
             <ZoomIn size={16} />
           </button>
         </div>
