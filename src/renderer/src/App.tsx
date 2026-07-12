@@ -10,6 +10,7 @@ import ComicReader from './components/reader/ComicReader'
 import type { TocItem } from './components/reader/EpubReader'
 import SettingsDialog from './components/layout/SettingsDialog'
 import { useAppStore } from './stores/appStore'
+import { getThemeStyle } from './lib/readingTheme'
 
 const TOC_FORMATS = new Set(['EPUB', 'TXT', 'MD', 'MARKDOWN', 'MOBI', 'AZW', 'AZW3'])
 
@@ -34,6 +35,18 @@ export default function App() {
     document.documentElement.classList.toggle('dark', darkMode)
     window.scrollAPI.setBackgroundColor(darkMode ? '#111827' : '#ffffff').catch(() => {})
   }, [darkMode])
+
+  // Apply reading theme as CSS custom properties
+  const readingTheme = useAppStore((s) => s.readingTheme)
+  const readingFont = useAppStore((s) => s.readingFont)
+  useEffect(() => {
+    const style = getThemeStyle(readingTheme, readingFont)
+    const root = document.documentElement
+    root.style.setProperty('--reader-bg', style.backgroundColor)
+    root.style.setProperty('--reader-text', style.color)
+    if (style.fontFamily) root.style.setProperty('--reader-font', style.fontFamily)
+    else root.style.removeProperty('--reader-font')
+  }, [readingTheme, readingFont])
 
   // Load library from storage
   useEffect(() => {
@@ -83,7 +96,6 @@ export default function App() {
       if (typeof saved === 'string') useAppStore.getState().setReadingTheme(saved as any)
     }).catch(() => {})
   }, [])
-  const { readingTheme, readingFont } = useAppStore()
   useEffect(() => {
     window.scrollAPI.storage.set('readingTheme', readingTheme).catch(() => {})
   }, [readingTheme])

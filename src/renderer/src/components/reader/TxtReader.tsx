@@ -2,8 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import { parseTxt, type TxtChapter } from '../../lib/txtParser'
 import { useAppStore } from '../../stores/appStore'
-import ReaderThemeBar from './ReaderThemeBar'
-import { getThemeStyle } from '../../lib/readingTheme'
 import { useI18n } from '../../lib/i18n'
 
 interface Props {
@@ -139,13 +137,13 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
   }, [])
 
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: themeStyle.backgroundColor }}>
-      <div className="h-10 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-3 no-select flex-shrink-0" style={{ backgroundColor: themeStyle.backgroundColor }}>
+    <div className="h-full flex flex-col bg-white dark:bg-gray-950">
+      <div className="h-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800
+                      flex items-center justify-between px-3 no-select flex-shrink-0">
         <button onClick={onClose} className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
           ← {t('app.backToLibrary')}
         </button>
         <span className="text-xs text-gray-400 truncate max-w-[300px]">{title}</span>
-	        <ReaderThemeBar />
         <div className="flex items-center gap-3">
           <button onClick={decreaseFont} className="p-1 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
             <ZoomOut size={16} />
@@ -157,7 +155,7 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
         </div>
       </div>
 
-      <div ref={setContentRef} className="flex-1 overflow-auto scrollbar-thin" style={{ backgroundColor: themeStyle.backgroundColor }}>
+      <div ref={setContentRef} className="flex-1 overflow-auto scrollbar-thin">
         {loading && (
           <div className="flex items-center justify-center h-full">
             <div className="flex gap-1.5">

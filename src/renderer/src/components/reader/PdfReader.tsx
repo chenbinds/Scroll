@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
-import ReaderThemeBar from './ReaderThemeBar'
-import { getThemeStyle } from '../../lib/readingTheme'
 import { useI18n } from '../../lib/i18n'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -21,9 +19,6 @@ interface Props {
 
 export default function PdfReader({ filePath, onClose, onPageChange, initialPage }: Props) {
   const { t } = useI18n()
-  const readingTheme = useAppStore((s) => s.readingTheme)
-  const readingFont = useAppStore((s) => s.readingFont)
-  const themeStyle = getThemeStyle(readingTheme, readingFont)
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null)
   const [pageCount, setPageCount] = useState(0)
   const [scale, setScale] = useState(1.5)
@@ -217,16 +212,16 @@ export default function PdfReader({ filePath, onClose, onPageChange, initialPage
   const zoomOut = useCallback(() => setScale((s) => Math.round(Math.max(s - 0.25, 0.5) * 100) / 100), [])
 
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: themeStyle.backgroundColor }}>
+    <div className="h-full flex flex-col bg-gray-100 dark:bg-gray-950">
       {/* Top toolbar */}
-      <div className="h-10 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-3 no-select flex-shrink-0" style={{ backgroundColor: themeStyle.backgroundColor }}>
+      <div className="h-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800
+                      flex items-center justify-between px-3 no-select flex-shrink-0">
         <button onClick={onClose}
           className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
           ← {t('app.backToLibrary')}
         </button>
 
         <div className="flex items-center gap-3">
-          <ReaderThemeBar />
           <button onClick={zoomOut}
             className="p-1 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
             <ZoomOut size={16} />

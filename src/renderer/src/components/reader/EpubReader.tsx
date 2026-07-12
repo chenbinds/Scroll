@@ -3,8 +3,6 @@ import { ZoomIn, ZoomOut } from 'lucide-react'
 import { parseEpub, type EpubContent, type TocItem } from '../../lib/epubParser'
 import { useAppStore } from '../../stores/appStore'
 import { useI18n } from '../../lib/i18n'
-import ReaderThemeBar from './ReaderThemeBar'
-import { getThemeStyle } from '../../lib/readingTheme'
 
 interface Props {
   filePath: string
@@ -19,9 +17,6 @@ export type { TocItem }
 
 export default function EpubReader({ filePath, onClose, onProgress, onTocReady, initialChapterIndex, initialProgress }: Props) {
   const { t } = useI18n()
-  const readingTheme = useAppStore((s) => s.readingTheme)
-  const readingFont = useAppStore((s) => s.readingFont)
-  const themeStyle = getThemeStyle(readingTheme, readingFont)
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
   const [loading, setLoading] = useState(true)
@@ -192,15 +187,15 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
   }, [epubContent])
 
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: themeStyle.backgroundColor }}>
+    <div className="h-full flex flex-col bg-white dark:bg-gray-950">
       {/* Toolbar */}
-      <div className="h-10 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-3 no-select flex-shrink-0" style={{ backgroundColor: themeStyle.backgroundColor }}>
+      <div className="h-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800
+                      flex items-center justify-between px-3 no-select flex-shrink-0">
         <button onClick={onClose}
           className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
           ← {t('app.backToLibrary')}
         </button>
         <span className="text-xs text-gray-400 truncate max-w-[300px]">{title}</span>
-	        <ReaderThemeBar />
         <div className="flex items-center gap-3">
           <button onClick={decreaseFont}
             className="p-1 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
@@ -215,7 +210,7 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
       </div>
 
       {/* Content — full render, callback ref stores DOM el for TocPanel */}
-      <div ref={setContentRef} className="flex-1 overflow-auto scrollbar-thin" style={{ backgroundColor: themeStyle.backgroundColor }}>
+      <div ref={setContentRef} className="flex-1 overflow-auto scrollbar-thin">
         {loading && (
           <div className="flex items-center justify-center h-full">
             <div className="flex gap-1.5">
@@ -236,7 +231,7 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
         )}
 
         {!loading && !error && chapterElements && (
-          <div className="max-w-4xl mx-auto px-8 py-6 reader-content" style={{ fontSize: `${fontSize}%`, backgroundColor: themeStyle.backgroundColor, fontFamily: themeStyle.fontFamily }}>
+          <div className="max-w-4xl mx-auto px-8 py-6 reader-content" style={{ fontSize: `${fontSize}%` }}>
             <h1 className="text-2xl font-bold mb-2 text-center text-gray-900 dark:text-gray-100">{title}</h1>
             {author && author !== 'Unknown Author' && (
               <p className="text-sm text-center text-gray-400 dark:text-gray-600 mb-8">{author}</p>

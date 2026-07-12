@@ -31,17 +31,18 @@ body {
    ============================================================ */
 
 .reader-content {
+  background-color: var(--reader-bg);
+  color: var(--reader-text);
   font-family: var(--reader-font) !important;
   font-size: 1.125rem;
   line-height: 1.85;
-  color: #111;
   font-weight: 400;
 }
 .reader-content * {
   font-family: var(--reader-font) !important;
 }
 
-.dark .reader-content { color: #d4d4d4; }
+.dark .reader-content { background-color: unset; color: #d4d4d4; }
 .dark .reader-content h1,
 .dark .reader-content h2,
 .dark .reader-content h3 { color: #e5e5e5; }
