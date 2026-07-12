@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
+import { useAppStore } from '../../stores/appStore'
 import DoubanBadge from './DoubanBadge'
 import ReaderThemeBar from './ReaderThemeBar'
 import { useI18n } from '../../lib/i18n'
@@ -28,6 +29,7 @@ export default function PdfReader({ filePath, onClose, onPageChange, initialPage
   const [error, setError] = useState<string | null>(null)
   const [renderedPages, setRenderedPages] = useState<Set<number>>(new Set([1]))
   const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map())
+  const coverCapturedRef = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const observerRef = useRef<IntersectionObserver | null>(null)
 
@@ -127,6 +129,20 @@ export default function PdfReader({ filePath, onClose, onPageChange, initialPage
 
       await page.render({ canvasContext: ctx, viewport }).promise
       setRenderedPages((prev) => new Set(prev).add(pageNum))
+      // Capture page 1 as cover thumbnail
+      if (pageNum === 1 && !coverCapturedRef.current && useAppStore.getState().currentBook?.format === 'PDF') {
+        coverCapturedRef.current = true
+        try {
+          const thumbCanvas = document.createElement('canvas')
+          const thumbCtx = thumbCanvas.getContext('2d')!
+          const thumbW = 240, thumbH = Math.round(240 * (viewport.height / viewport.width))
+          thumbCanvas.width = thumbW; thumbCanvas.height = thumbH
+          thumbCtx.drawImage(canvas, 0, 0, thumbW, thumbH)
+          const dataUrl = thumbCanvas.toDataURL('image/jpeg', 0.7)
+          const st = useAppStore.getState()
+          st.setBooks(st.books.map((b) => b.id === st.currentBook!.id ? { ...b, coverUrl: dataUrl } : b))
+        } catch (_) {}
+      }
     } catch (err) {
       console.error(`Page ${pageNum} render error:`, err)
     }
