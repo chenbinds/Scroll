@@ -352,14 +352,8 @@ export async function parseMobi(base64Data: string): Promise<MobiContent> {
     // Strip leading garbage before the first real HTML tag
     .replace(/^[\s\S]{0,200}?(?=<(?:h[1-6]|div|p[\s>]|a[\s>]))/i, '')
 
-  // Strip font size attributes so CSS font-size scaling works
-  html = html.replace(/<font[^>]*>/gi, (tag) => tag.replace(/\s*size\s*=\s*["'][^"']*["']/gi, '').replace(/\s*size\s*=\s*\d+/gi, ''))
-  // Remove fixed width/height that interfere with layout
-  html = html.replace(/\s+width\s*=\s*["']0pt["']/gi, '')
-  html = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<mbp:pagebreak[^>]*\/?>/gi, '').replace(/<a[^>]*filepos=\d+[^>]*>[\s\S]*?<\/a>/gi, '').replace(/<a[^>]*>\s*<\/a>/gi, '').replace(/�/g, '').trim()
-
   // ── Chapter detection: support multiple heading formats ──────────
-  // Many MOBI books use <font size="7"><b> or <p align="center"><font> instead of <h1>-<h3>
+  // Must run BEFORE font size stripping (which removes the size attr we match on)
   const chapters: MobiChapter[] = []
   const headingMatches: { pos: number; heading: string }[] = []
 
@@ -376,7 +370,6 @@ export async function parseMobi(base64Data: string): Promise<MobiContent> {
     const fontH = /<font\s+size="7"\s*>\s*<b>([^<]+)<\/b>\s*<\/font>/gi
     while ((m = fontH.exec(html)) !== null) {
       const h = m[1].trim()
-      // Filter: skip short labels (figure captions like "图2") and empty
       if (h && h.length >= 4 && h.length < 200 && !/^图\d/.test(h) && !/^\d+$/.test(h))
         headingMatches.push({ pos: m.index, heading: h })
     }
@@ -400,6 +393,13 @@ export async function parseMobi(base64Data: string): Promise<MobiContent> {
   } else {
     chapters.push({ title, html })
   }
+
+  // Strip font size attributes so CSS font-size scaling works
+  // MUST run AFTER heading detection (which relies on size attr)
+  html = html.replace(/<font[^>]*>/gi, (tag) => tag.replace(/\s*size\s*=\s*["'][^"']*["']/gi, '').replace(/\s*size\s*=\s*\d+/gi, ''))
+  // Remove fixed width/height that interfere with layout
+  html = html.replace(/\s+width\s*=\s*["']0pt["']/gi, '')
+  html = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<mbp:pagebreak[^>]*\/?>/gi, '').replace(/<a[^>]*filepos=\d+[^>]*>[\s\S]*?<\/a>/gi, '').replace(/<a[^>]*>\s*<\/a>/gi, '').replace(/�/g, '').trim()
 
   return { metadata: { title, author }, chapters }
 }
