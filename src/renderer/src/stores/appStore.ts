@@ -7,6 +7,7 @@ export interface Book {
   format: string
   path: string
   coverUrl?: string
+  doubanRating?: number
   addedAt: number
   lastReadAt: number
   progress: number // 0-100

@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 import { Book as BookIcon, Plus, FolderOpen } from 'lucide-react'
 import { useAppStore, type Book } from '../../stores/appStore'
 import { useI18n } from '../../lib/i18n'
@@ -37,12 +37,18 @@ export default function LibraryView() {
 
       addBook(book)
 
+      // Fetch Douban rating
+      const searchTitle = book.title.length > 3 ? book.title : book.title + ' ' + (book.author !== 'Unknown Author' ? book.author : '')
+      window.scrollAPI.doubanSearch(searchTitle).then((info: any) => {
+        if (info?.rating) updateBook(book.id, { doubanRating: info.rating })
+      }).catch(() => {})
+
       // Async: extract cover in background (EPUB + MOBI via Calibre)
       const fmt = ext.toUpperCase()
       if (fmt === 'EPUB') {
         window.scrollAPI.readPath(path).then((base64) => {
           extractEpubCover(base64).then((coverUrl) => {
-            if (coverUrl) updateBookCover(book.id, coverUrl)
+            if (coverUrl) updateBook(book.id, { coverUrl })
           }).catch(() => {})
         }).catch(() => {})
       } else if (fmt === 'MOBI' || fmt === 'AZW' || fmt === 'AZW3') {
@@ -51,20 +57,40 @@ export default function LibraryView() {
           if (epubPath) {
             window.scrollAPI.readPath(epubPath).then((base64) => {
               extractEpubCover(base64).then((coverUrl) => {
-                if (coverUrl) updateBookCover(book.id, coverUrl)
+                if (coverUrl) updateBook(book.id, { coverUrl })
               }).catch(() => {})
             }).catch(() => {})
           }
         }).catch(() => {})
       }
 
-      function updateBookCover(id: string, coverUrl: string) {
+      function updateBook(id: string, patch: Partial<Book>) {
         useAppStore.getState().setBooks(
-          useAppStore.getState().books.map((b) => b.id === id ? { ...b, coverUrl } : b)
+          useAppStore.getState().books.map((b) => b.id === id ? { ...b, ...patch } : b)
         )
       }
     }
   }, [addBook, t])
+
+  // Fetch Douban ratings for books without one (background, one-by-one)
+  useEffect(() => {
+    const unrated = books.filter((b) => b.doubanRating == null && b.title.length > 2)
+    if (unrated.length === 0) return
+    let i = 0
+    const next = () => {
+      if (i >= unrated.length) return
+      const b = unrated[i++]
+      const q = b.title.length > 4 ? b.title : b.title + ' ' + (b.author !== t('library.unknownAuthor') ? b.author : '')
+      window.scrollAPI.doubanSearch(q).then((info: any) => {
+        if (info?.rating) {
+          useAppStore.getState().setBooks(
+            useAppStore.getState().books.map((x) => x.id === b.id ? { ...x, doubanRating: info.rating } : x)
+          )
+        }
+      }).catch(() => {}).finally(() => setTimeout(next, 2000)) // rate limit
+    }
+    next()
+  }, [books.length])
 
   return (
     <div className="h-full overflow-y-auto scrollbar-thin">

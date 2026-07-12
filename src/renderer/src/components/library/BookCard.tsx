@@ -1,4 +1,4 @@
-import { X } from 'lucide-react'
+import { X, Star } from 'lucide-react'
 import type { Book } from '../../stores/appStore'
 
 const FORMAT_COLORS: Record<string, string> = {
@@ -61,6 +61,15 @@ export default function BookCard({ book, onClick, onDelete }: Props) {
           <span className={`absolute top-2 right-2 text-[10px] font-semibold px-1.5 py-0.5 rounded ${formatClass}`}>
             {book.format}
           </span>
+
+          {/* Douban rating badge — bottom left */}
+          {book.doubanRating != null && (
+            <div className="absolute bottom-6 left-1.5 flex items-center gap-0.5 bg-black/60 text-yellow-400
+                            text-[11px] font-medium px-1.5 py-0.5 rounded">
+              <Star size={11} fill="currentColor" />
+              {book.doubanRating.toFixed(1)}
+            </div>
+          )}
 
           {/* Progress bar — always visible */}
           <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-200 dark:bg-gray-700">
