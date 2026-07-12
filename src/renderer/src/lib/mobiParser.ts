@@ -301,6 +301,41 @@ export async function parseMobi(base64Data: string): Promise<MobiContent> {
 
   let html = decode.decode(new Uint8Array(allOutput))
 
+  // ── Image extraction: convert recindex to base64 data URLs ──────────
+  // MOBI images are stored in PDB records.
+  // recindex is 0-based: recindex=0 → record[resourceStart], recindex=1 → record[resourceStart+1], etc.
+  // For images before resourceStart, try direct record index
+  const resourceStart = (mobi.resourceStart as number) ?? 0xFFFFFFFF
+  const rs = (resourceStart > 0 && resourceStart < numRecords && resourceStart !== 0xFFFFFFFF) ? resourceStart : 0
+  const seenImages = new Map<string, string>()
+  html = html.replace(/recindex="(\d+)"/gi, (_match, numStr: string) => {
+    if (seenImages.has(numStr)) return seenImages.get(numStr)!
+    const idx = parseInt(numStr, 10)
+    // Try: 1) resourceStart + idx, 2) idx directly
+    let imgData: Uint8Array | null = null
+    for (const candidate of [rs + idx, idx]) {
+      try {
+        const d = readRecord(candidate)
+        if (d.length > 2 && ((d[0] === 0xFF && d[1] === 0xD8) || (d[0] === 0x89 && d[1] === 0x50) || (d[0] === 0x47 && d[1] === 0x49))) {
+          imgData = d; break
+        }
+      } catch (_) {}
+    }
+    if (!imgData) return _match // keep original
+    // Detect image type from magic bytes
+    let mime = 'image/jpeg'
+    if (imgData[0] === 0x89 && imgData[1] === 0x50) mime = 'image/png'
+    else if (imgData[0] === 0x47 && imgData[1] === 0x49) mime = 'image/gif'
+    else if (imgData[0] === 0x42 && imgData[1] === 0x4D) mime = 'image/bmp'
+    // Convert to base64 data URL
+    let binary = ''
+    for (let bi = 0; bi < imgData.length; bi++) binary += String.fromCharCode(imgData[bi])
+    const b64 = btoa(binary)
+    const result = `src="data:${mime};base64,${b64}"`
+    seenImages.set(numStr, result)
+    return result
+  })
+
   // Strip KF8 flow document wrappers: XML declarations, DOCTYPE, html/head/body tags
   // KF8 content is multi-document; we want to keep all body content
   html = html
@@ -317,13 +352,45 @@ export async function parseMobi(base64Data: string): Promise<MobiContent> {
     // Strip leading garbage before the first real HTML tag
     .replace(/^[\s\S]{0,200}?(?=<(?:h[1-6]|div|p[\s>]|a[\s>]))/i, '')
 
+  // Strip font size attributes so CSS font-size scaling works
+  html = html.replace(/<font[^>]*>/gi, (tag) => tag.replace(/\s*size\s*=\s*["'][^"']*["']/gi, '').replace(/\s*size\s*=\s*\d+/gi, ''))
+  // Remove fixed width/height that interfere with layout
+  html = html.replace(/\s+width\s*=\s*["']0pt["']/gi, '')
   html = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<mbp:pagebreak[^>]*\/?>/gi, '').replace(/<a[^>]*filepos=\d+[^>]*>[\s\S]*?<\/a>/gi, '').replace(/<a[^>]*>\s*<\/a>/gi, '').replace(/�/g, '').trim()
 
+  // ── Chapter detection: support multiple heading formats ──────────
+  // Many MOBI books use <font size="7"><b> or <p align="center"><font> instead of <h1>-<h3>
   const chapters: MobiChapter[] = []
-  const headingPattern = /<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi
-  let m: RegExpExecArray | null
   const headingMatches: { pos: number; heading: string }[] = []
-  while ((m = headingPattern.exec(html)) !== null) { const h = m[1].replace(/<[^>]+>/g, '').trim(); if (h) headingMatches.push({ pos: m.index, heading: h }) }
+
+  // Pattern 1: Standard <h1> through <h3> tags
+  const hPattern = /<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi
+  let m: RegExpExecArray | null
+  while ((m = hPattern.exec(html)) !== null) {
+    const h = m[1].replace(/<[^>]+>/g, '').trim()
+    if (h && h.length < 200) headingMatches.push({ pos: m.index, heading: h })
+  }
+
+  // Pattern 2: <font size="7"><b>Title</b></font> (common MOBI chapter headings)
+  if (headingMatches.length === 0) {
+    const fontH = /<font\s+size="7"\s*>\s*<b>([^<]+)<\/b>\s*<\/font>/gi
+    while ((m = fontH.exec(html)) !== null) {
+      const h = m[1].trim()
+      // Filter: skip short labels (figure captions like "图2") and empty
+      if (h && h.length >= 4 && h.length < 200 && !/^图\d/.test(h) && !/^\d+$/.test(h))
+        headingMatches.push({ pos: m.index, heading: h })
+    }
+  }
+
+  // Pattern 3: <font size="6"><b>Title</b></font> (sub-headings)
+  if (headingMatches.length === 0) {
+    const fontH2 = /<font\s+size="[56]"\s*>\s*<b>([^<]+)<\/b>\s*<\/font>/gi
+    while ((m = fontH2.exec(html)) !== null) {
+      const h = m[1].trim()
+      if (h && h.length >= 4 && h.length < 200 && !/^图\d/.test(h) && !/^\d+$/.test(h))
+        headingMatches.push({ pos: m.index, heading: h })
+    }
+  }
   if (headingMatches.length > 0) {
     for (let i = 0; i < headingMatches.length; i++) {
       const start = headingMatches[i].pos, end = i + 1 < headingMatches.length ? headingMatches[i + 1].pos : html.length
