@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { Book as BookIcon, Plus, FolderOpen } from 'lucide-react'
 import { useAppStore, type Book } from '../../stores/appStore'
 import { useI18n } from '../../lib/i18n'

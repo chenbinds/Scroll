@@ -163,14 +163,19 @@ ipcMain.handle('file:readPath', async (_event, filePath: string) => {
   } catch { return null }
 })
 
-// Douban search: fetch rating/summary for a book
+// Douban search proxy: fetch via session (has browser TLS fingerprint)
 ipcMain.handle('douban:search', async (_event, title: string, author?: string) => {
   try {
     const query = encodeURIComponent(author ? `${title} ${author}` : title)
-    const resp = await net.fetch(
-      `https://book.douban.com/subject_search?search_text=${encodeURIComponent(query)}`,
-      { headers: { 'User-Agent': 'Mozilla/5.0' } }
-    )
+    const url = `https://book.douban.com/subject_search?search_text=${query}`
+    // Use session.defaultSession.fetch for browser-like behavior
+    const resp = await net.fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'zh-CN,zh;q=0.9',
+      },
+    })
     const html = await resp.text()
     // Find rating blocks and extract nearby title + url
     const ratingRe = /"rating":\s*\{"count":\s*\d+,\s*"rating_info":\s*"[^"]*",\s*"star_count":\s*[\d.]+,\s*"value":\s*([\d.]+)\}/g
