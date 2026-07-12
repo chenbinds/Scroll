@@ -221,21 +221,21 @@ export default function PdfReader({ filePath, onClose, onPageChange, initialPage
       {/* Top toolbar */}
       <div className="h-10 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-3 no-select flex-shrink-0" style={{ backgroundColor: themeStyle.backgroundColor }}>
         <button onClick={onClose}
-          className="text-sm transition-colors" style={{ color: themeStyle.color, opacity: 0.7 }}>
+          className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
           ← {t('app.backToLibrary')}
         </button>
 
         <div className="flex items-center gap-3">
           <ReaderThemeBar />
           <button onClick={zoomOut}
-            className="p-1 transition-colors" style={{ color: themeStyle.color, opacity: 0.6 }}>
+            className="p-1 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
             <ZoomOut size={16} />
           </button>
           <span className="text-xs text-gray-400 tabular-nums w-10 text-center">
             {Math.round(scale * 100)}%
           </span>
           <button onClick={zoomIn}
-            className="p-1 transition-colors" style={{ color: themeStyle.color, opacity: 0.6 }}>
+            className="p-1 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
             <ZoomIn size={16} />
           </button>
         </div>
