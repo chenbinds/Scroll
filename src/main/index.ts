@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, net } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 
@@ -153,6 +153,32 @@ ipcMain.handle('mobi:convert', async (_event, filePath: string) => {
       resolve(epubPath)
     })
   })
+})
+
+// Douban search: fetch rating/summary for a book
+ipcMain.handle('douban:search', async (_event, title: string, author?: string) => {
+  try {
+    const query = encodeURIComponent(author ? `${title} ${author}` : title)
+    const url = `https://book.douban.com/subject_search?search_text=${query}`
+    const response = await net.fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
+    const html = await response.text()
+    // Extract first search result
+    const itemMatch = html.match(/<li class="subject-item">[\s\S]*?<\/li>/)
+    if (!itemMatch) return null
+    const item = itemMatch[0]
+    // Rating
+    const ratingMatch = item.match(/<span class="rating_nums">([\d.]+)<\/span>/)
+    const rating = ratingMatch ? parseFloat(ratingMatch[1]) : undefined
+    // Title
+    const titleMatch = item.match(/title="([^"]+)"/)
+    // Cover image
+    const imgMatch = item.match(/<img[^>]*src="([^"]+)"/)
+    const cover = imgMatch ? imgMatch[1] : undefined
+    // Summary snippet
+    const pubMatch = item.match(/<div class="pub">\s*([\s\S]*?)\s*<\/div>/)
+    const pub = pubMatch ? pubMatch[1].replace(/<[^>]+>/g, '').trim() : undefined
+    return rating ? { rating, rated: rating, title: titleMatch?.[1], cover, pub, url: `https://book.douban.com/subject_search?search_text=${query}` } : null
+  } catch { return null }
 })
 
 // 存储：读取

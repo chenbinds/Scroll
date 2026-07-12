@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
+import DoubanBadge from './DoubanBadge'
 import ReaderThemeBar from './ReaderThemeBar'
 import { useI18n } from '../../lib/i18n'
 

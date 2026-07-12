@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { Book as BookIcon, Plus, FolderOpen } from 'lucide-react'
 import { useAppStore, type Book } from '../../stores/appStore'
 import { useI18n } from '../../lib/i18n'
+import { extractEpubCover } from '../../lib/epubParser'
 import BookCard from './BookCard'
 
 export default function LibraryView() {
@@ -35,6 +36,19 @@ export default function LibraryView() {
       }
 
       addBook(book)
+
+      // Async: extract EPUB cover in background
+      if (ext.toUpperCase() === 'EPUB') {
+        window.scrollAPI.readFile(path).then((base64) => {
+          extractEpubCover(base64).then((coverUrl) => {
+            if (coverUrl) {
+              useAppStore.getState().setBooks(
+                useAppStore.getState().books.map((b) => b.id === book.id ? { ...b, coverUrl } : b)
+              )
+            }
+          }).catch(() => {})
+        }).catch(() => {})
+      }
     }
   }, [addBook, t])
 

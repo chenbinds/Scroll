@@ -23,9 +23,45 @@ export interface EpubContent {
   toc: TocItem[]
   spine: { id: string; href: string }[]
   files: Map<string, string>
+  coverUrl?: string
 }
 
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp'])
+
+/** Lightweight: extract only the cover image from an EPUB — no full parse */
+export async function extractEpubCover(base64Data: string): Promise<string | undefined> {
+  try {
+    const binaryStr = atob(base64Data)
+    const bytes = new Uint8Array(binaryStr.length)
+    for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i)
+    const zip = await JSZip.loadAsync(bytes)
+
+    // Find OPF
+    const containerFile = zip.file('META-INF/container.xml')
+    if (!containerFile) return undefined
+    const containerXml = await containerFile.async('text')
+    const opfMatch = containerXml.match(/full-path="([^"]+)"/)
+    if (!opfMatch) return undefined
+
+    const opfPath = opfMatch[1]
+    const opfDir = opfPath.includes('/') ? opfPath.substring(0, opfPath.lastIndexOf('/') + 1) : ''
+    const opfFile = zip.file(opfPath)
+    if (!opfFile) return undefined
+    const opfXml = await opfFile.async('text')
+
+    const { cov } = parseOpf(opfXml, '')
+    if (!cov?.href) return undefined
+
+    // Resolve and extract cover image
+    const coverPath = opfDir + cov.href
+    const coverFile = zip.file(coverPath)
+    if (!coverFile) return undefined
+    const ext = coverPath.split('.').pop()?.toLowerCase() || 'jpg'
+    const mime = ext === 'jpg' ? 'jpeg' : ext === 'svg' ? 'svg+xml' : ext
+    const b64 = await coverFile.async('base64')
+    return `data:image/${mime};base64,${b64}`
+  } catch { return undefined }
+}
 
 export async function parseEpub(base64Data: string): Promise<EpubContent> {
   const binaryStr = atob(base64Data)
@@ -159,6 +195,14 @@ export async function parseEpub(base64Data: string): Promise<EpubContent> {
   }
   assignSpineIndex(toc)
 
+  // Extract cover image
+  let coverUrl: string | undefined
+  const { cov } = opf
+  if (cov?.href) {
+    const key = resolveRelative(opfDir, cov.href)
+    if (imageDataUrls.has(key)) coverUrl = imageDataUrls.get(key)
+  }
+
   return {
     metadata: {
       title: metadata.title || 'Untitled',
@@ -166,7 +210,8 @@ export async function parseEpub(base64Data: string): Promise<EpubContent> {
     },
     toc,
     spine: resolvedSpine,
-    files
+    files,
+    coverUrl
   }
 }
 
@@ -179,6 +224,7 @@ function parseOpf(xml: string, baseDir: string): {
   metadata: Record<string, string>
   manifest: { id: string; href: string; mediaType: string }[]
   spine: { id: string }[]
+  cov: { href: string } | null
 } {
   const metadata: Record<string, string> = {}
   const titleMatch = xml.match(/<dc:title[^>]*>([^<]+)<\/dc:title>/)
@@ -202,6 +248,25 @@ function parseOpf(xml: string, baseDir: string): {
     }
   }
 
+  // Detect cover image
+  let cov: { href: string } | null = null
+  // EPUB 2: <meta name="cover" content="cover-id"/>
+  const coverMeta = xml.match(/<meta\s+[^>]*name="cover"[^>]*content="([^"]+)"[^>]*\/?>/)
+  if (coverMeta) {
+    const coverItem = manifest.find((x) => x.id === coverMeta[1])
+    if (coverItem) cov = { href: coverItem.href }
+  }
+  // EPUB 3: <item properties="cover-image"/>
+  if (!cov) {
+    const cov3Match = xml.match(/<item\s+[^>]*properties="cover-image"[^>]*href="([^"]+)"[^>]*\/?>/)
+    if (cov3Match) cov = { href: cov3Match[1] }
+  }
+  // Fallback: first image manifest item
+  if (!cov) {
+    const imgItem = manifest.find((x) => /image\//i.test(x.mediaType))
+    if (imgItem) cov = { href: imgItem.href }
+  }
+
   const spine: { id: string }[] = []
   const spineMatch = xml.match(/<spine[^>]*>([\s\S]*?)<\/spine>/)
   if (spineMatch) {
@@ -212,7 +277,7 @@ function parseOpf(xml: string, baseDir: string): {
     }
   }
 
-  return { metadata, manifest, spine }
+  return { metadata, manifest, spine, cov }
 }
 
 function resolveRelative(baseDir: string, rel: string): string {

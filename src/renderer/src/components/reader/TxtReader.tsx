@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import { parseTxt, type TxtChapter } from '../../lib/txtParser'
 import { useAppStore } from '../../stores/appStore'
+import DoubanBadge from './DoubanBadge'
 import ReaderThemeBar from './ReaderThemeBar'
 import { useI18n } from '../../lib/i18n'
 
@@ -146,6 +147,7 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
         </button>
         <span className="text-xs text-gray-400 truncate max-w-[300px]">{title}</span>
           <ReaderThemeBar />
+          <DoubanBadge title={title} author={author} />
         <div className="flex items-center gap-3">
           <button onClick={decreaseFont} className="p-1 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
             <ZoomOut size={16} />

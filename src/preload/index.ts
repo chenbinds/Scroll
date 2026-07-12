@@ -22,6 +22,9 @@ contextBridge.exposeInMainWorld('scrollAPI', {
   // MOBI → EPUB conversion (via Calibre ebook-convert)
   convertMobi: (filePath: string) => ipcRenderer.invoke('mobi:convert', filePath),
 
+  // Douban book search
+  doubanSearch: (title: string, author?: string) => ipcRenderer.invoke('douban:search', title, author),
+
   // 存储（JSON 文件持久化）
   storage: {
     get: (key: string, defaultValue: unknown) => ipcRenderer.invoke('storage:get', key, defaultValue),
@@ -40,6 +43,7 @@ export interface AiChatParams {
 
 export interface ScrollAPI {
   convertMobi: (filePath: string) => Promise<string | null>
+  doubanSearch: (title: string, author?: string) => Promise<any>
   openBookDialog: () => Promise<string[] | null>
   openMusicDialog: () => Promise<string[] | null>
   readFile: (filePath: string) => Promise<string>
