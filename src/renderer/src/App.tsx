@@ -146,7 +146,9 @@ export default function App() {
           onProgress={(chapterIndex, _count, progress) => {
             updateBookProgress(currentBook.id, progress, chapterIndex)
             useAppStore.getState().setReadingPosition({ chapter: String(chapterIndex), page: chapterIndex, percent: progress })
-          }} />
+          }}
+          onTocReady={(toc: any) => { useAppStore.getState().setToc(toc) }}
+          />
 
       case 'CBZ':
       case 'CBR':
