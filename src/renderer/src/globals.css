@@ -68,6 +68,10 @@ body {
 .reader-content img[height="1"],
 .reader-content img[height="2"],
 .reader-content img[height="3"] { display: inline; margin: 0; vertical-align: baseline; max-width: none; }
+/* Constrain inline image height to roughly match surrounding text */
+.reader-content sup img,
+.reader-content sub img,
+.reader-content a img { max-height: 1.4em; width: auto; }
 .reader-content img[src=""],
 .reader-content img:not([src]) { display: none; }
 
