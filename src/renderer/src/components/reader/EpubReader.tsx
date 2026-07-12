@@ -236,7 +236,7 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
         )}
 
         {!loading && !error && chapterElements && (
-          <div className="max-w-4xl mx-auto px-8 py-6 reader-content" style={{ fontSize: `${fontSize}%`, ...themeStyle }}>
+          <div className="max-w-4xl mx-auto px-8 py-6 reader-content" style={{ fontSize: `${fontSize}%`, backgroundColor: themeStyle.backgroundColor, fontFamily: themeStyle.fontFamily }}>
             <h1 className="text-2xl font-bold mb-2 text-center text-gray-900 dark:text-gray-100">{title}</h1>
             {author && author !== 'Unknown Author' && (
               <p className="text-sm text-center text-gray-400 dark:text-gray-600 mb-8">{author}</p>
