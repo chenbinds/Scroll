@@ -167,25 +167,27 @@ ipcMain.handle('file:readPath', async (_event, filePath: string) => {
 ipcMain.handle('douban:search', async (_event, title: string, author?: string) => {
   try {
     const query = encodeURIComponent(author ? `${title} ${author}` : title)
-    const url = `https://book.douban.com/subject_search?search_text=${query}`
-    const response = await net.fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
-    const html = await response.text()
-    // Extract first search result
-    const itemMatch = html.match(/<li class="subject-item">[\s\S]*?<\/li>/)
-    if (!itemMatch) return null
-    const item = itemMatch[0]
-    // Rating
-    const ratingMatch = item.match(/<span class="rating_nums">([\d.]+)<\/span>/)
-    const rating = ratingMatch ? parseFloat(ratingMatch[1]) : undefined
-    // Title
-    const titleMatch = item.match(/title="([^"]+)"/)
-    // Cover image
-    const imgMatch = item.match(/<img[^>]*src="([^"]+)"/)
-    const cover = imgMatch ? imgMatch[1] : undefined
-    // Summary snippet
-    const pubMatch = item.match(/<div class="pub">\s*([\s\S]*?)\s*<\/div>/)
-    const pub = pubMatch ? pubMatch[1].replace(/<[^>]+>/g, '').trim() : undefined
-    return rating ? { rating, rated: rating, title: titleMatch?.[1], cover, pub, url: `https://book.douban.com/subject_search?search_text=${query}` } : null
+    const resp = await net.fetch(
+      `https://book.douban.com/subject_search?search_text=${encodeURIComponent(query)}`,
+      { headers: { 'User-Agent': 'Mozilla/5.0' } }
+    )
+    const html = await resp.text()
+    // Find rating blocks and extract nearby title + url
+    const ratingRe = /"rating":\s*\{"count":\s*\d+,\s*"rating_info":\s*"[^"]*",\s*"star_count":\s*[\d.]+,\s*"value":\s*([\d.]+)\}/g
+    let rm: RegExpExecArray | null
+    while ((rm = ratingRe.exec(html)) !== null) {
+      const value = parseFloat(rm[1])
+      if (isNaN(value) || value <= 0) continue
+      // Look for title and url near this rating (within 300 chars)
+      const ctx = html.slice(Math.max(0, rm.index - 300), rm.index + 500)
+      const tMatch = ctx.match(/"title":\s*"([^"]+)"/)
+      const uMatch = ctx.match(/"url":\s*"(https:\/\/book\.douban\.com\/subject\/\d+\/)"/)
+      if (tMatch && uMatch) {
+        const bookTitle = tMatch[1].replace(/\\u([0-9a-fA-F]{4})/g, (_s: string, h: string) => String.fromCharCode(parseInt(h, 16)))
+        return { rating: value, url: uMatch[1], title: bookTitle }
+      }
+    }
+    return null
   } catch { return null }
 })
 
