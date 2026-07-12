@@ -301,17 +301,16 @@ export async function parseMobi(base64Data: string): Promise<MobiContent> {
 
   let html = decode.decode(new Uint8Array(allOutput))
 
-  // ── Image extraction: convert recindex to base64 data URLs ──────────
-  // MOBI images are stored in PDB records.
-  // recindex is 0-based: recindex=0 → record[resourceStart], recindex=1 → record[resourceStart+1], etc.
-  // For images before resourceStart, try direct record index
+  // ── Image extraction: convert <img recindex> to base64 data URLs ─────
+  // Only match recindex inside <img ... > tags to avoid false positives
   const resourceStart = (mobi.resourceStart as number) ?? 0xFFFFFFFF
   const rs = (resourceStart > 0 && resourceStart < numRecords && resourceStart !== 0xFFFFFFFF) ? resourceStart : 0
   const seenImages = new Map<string, string>()
-  html = html.replace(/recindex="(\d+)"/gi, (_match, numStr: string) => {
-    if (seenImages.has(numStr)) return seenImages.get(numStr)!
+  html = html.replace(/<img\s+[^>]*?recindex="(\d+)"([^>]*)>/gi, (fullMatch, numStr: string, rest: string) => {
+    if (seenImages.has(numStr)) {
+      return fullMatch.replace(/recindex="\d+"/i, seenImages.get(numStr)!)
+    }
     const idx = parseInt(numStr, 10)
-    // Try: 1) resourceStart + idx, 2) idx directly
     let imgData: Uint8Array | null = null
     for (const candidate of [rs + idx, idx]) {
       try {
@@ -321,19 +320,18 @@ export async function parseMobi(base64Data: string): Promise<MobiContent> {
         }
       } catch (_) {}
     }
-    if (!imgData) return _match // keep original
-    // Detect image type from magic bytes
+    if (!imgData) return fullMatch.replace(/recindex="\d+"/i, '')
     let mime = 'image/jpeg'
     if (imgData[0] === 0x89 && imgData[1] === 0x50) mime = 'image/png'
     else if (imgData[0] === 0x47 && imgData[1] === 0x49) mime = 'image/gif'
     else if (imgData[0] === 0x42 && imgData[1] === 0x4D) mime = 'image/bmp'
-    // Convert to base64 data URL
     let binary = ''
     for (let bi = 0; bi < imgData.length; bi++) binary += String.fromCharCode(imgData[bi])
-    const b64 = btoa(binary)
-    const result = `src="data:${mime};base64,${b64}"`
+    const result = `src="data:${mime};base64,${btoa(binary)}"`
     seenImages.set(numStr, result)
-    return result
+    // Reconstruct <img> tag with src attribute
+    const cleaned = rest.replace(/recindex="\d+"/i, '').replace(/\s{2,}/g, ' ')
+    return `<img ${result}${cleaned}>`
   })
 
   // Strip KF8 flow document wrappers: XML declarations, DOCTYPE, html/head/body tags
