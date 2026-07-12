@@ -16,6 +16,18 @@ const TOC_FORMATS = new Set(['EPUB', 'TXT', 'MD', 'MARKDOWN', 'MOBI', 'AZW', 'AZ
 export default function App() {
   const { currentView, currentBook, darkMode, setCurrentView, updateBookProgress } = useAppStore()
   const [showSettings, setShowSettings] = useState(false)
+  const [convertedEpubPath, setConvertedEpubPath] = useState<string | null>(null)
+
+  // Try Calibre conversion for MOBI/AZW3
+  useEffect(() => {
+    if (!currentBook) return
+    const fmt = currentBook.format.toUpperCase()
+    if (fmt === 'MOBI' || fmt === 'AZW' || fmt === 'AZW3') {
+      window.scrollAPI.convertMobi(currentBook.path).then((epubPath: string | null) => {
+        if (epubPath) setConvertedEpubPath(epubPath)
+      }).catch(() => {})
+    }
+  }, [currentBook])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode)
@@ -141,6 +153,17 @@ export default function App() {
       case 'MOBI':
       case 'AZW':
       case 'AZW3':
+        // Use Calibre-converted EPUB when available
+        if (convertedEpubPath) {
+          return <EpubReader filePath={convertedEpubPath} onClose={() => setCurrentView('library')}
+            initialChapterIndex={currentBook.currentPage || 0}
+            initialProgress={currentBook.progress || undefined}
+            onProgress={(chapterIndex: number, _count: number, progress: number) => {
+              updateBookProgress(currentBook.id, progress, chapterIndex)
+              useAppStore.getState().setReadingPosition({ chapter: String(chapterIndex), page: chapterIndex, percent: progress })
+            }}
+            onTocReady={(toc: any) => { useAppStore.getState().setToc(toc) }} />
+        }
         return <MobiReader filePath={currentBook.path} onClose={() => setCurrentView('library')}
           initialProgress={currentBook.progress || undefined}
           onProgress={(chapterIndex, _count, progress) => {

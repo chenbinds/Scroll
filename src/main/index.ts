@@ -127,6 +127,32 @@ ipcMain.handle('ai:chat', async (_event, { baseUrl, apiKey, model, messages, max
   }
 })
 
+import { execFile } from 'child_process'
+import { existsSync } from 'fs'
+
+// MOBI/AZW3 → EPUB conversion via Calibre's ebook-convert
+ipcMain.handle('mobi:convert', async (_event, filePath: string) => {
+  const candidates = [
+    'ebook-convert',
+    'C:/Program Files/Calibre2/ebook-convert.exe',
+    'C:/Program Files (x86)/Calibre2/ebook-convert.exe',
+  ]
+  let converter = ''
+  for (const c of candidates) {
+    if (existsSync(c) || c === 'ebook-convert') { converter = c; break }
+  }
+  if (!converter) return null
+
+  return new Promise((resolve) => {
+    const epubPath = filePath.replace(/\.\w+$/, '_conv.epub')
+    if (existsSync(epubPath)) { resolve(epubPath); return }
+    execFile(converter, [filePath, epubPath], { timeout: 120000 }, (err) => {
+      if (err || !existsSync(epubPath)) { resolve(null); return }
+      resolve(epubPath)
+    })
+  })
+})
+
 // 存储：读取
 ipcMain.handle('storage:get', async (_event, key: string, defaultValue: unknown) => {
   const { bookStore, settingsStore, musicStore } = await import('./storage')
