@@ -5,11 +5,13 @@ import ReaderView from './components/reader/ReaderView'
 import PdfReader from './components/reader/PdfReader'
 import EpubReader from './components/reader/EpubReader'
 import TxtReader from './components/reader/TxtReader'
+import MobiReader from './components/reader/MobiReader'
+import ComicReader from './components/reader/ComicReader'
 import type { TocItem } from './components/reader/EpubReader'
 import SettingsDialog from './components/layout/SettingsDialog'
 import { useAppStore } from './stores/appStore'
 
-const TOC_FORMATS = new Set(['EPUB', 'TXT', 'MD', 'MARKDOWN'])
+const TOC_FORMATS = new Set(['EPUB', 'TXT', 'MD', 'MARKDOWN', 'MOBI', 'AZW', 'AZW3'])
 
 export default function App() {
   const { currentView, currentBook, darkMode, setCurrentView, updateBookProgress } = useAppStore()
@@ -135,6 +137,27 @@ export default function App() {
             updateBookProgress(currentBook.id, pct, 0)
             useAppStore.getState().setReadingPosition({ percent: pct })
           }} />
+
+      case 'MOBI':
+      case 'AZW':
+      case 'AZW3':
+        return <MobiReader filePath={currentBook.path} onClose={() => setCurrentView('library')}
+          initialProgress={currentBook.progress || undefined}
+          onProgress={(chapterIndex, _count, progress) => {
+            updateBookProgress(currentBook.id, progress, chapterIndex)
+            useAppStore.getState().setReadingPosition({ chapter: String(chapterIndex), page: chapterIndex, percent: progress })
+          }} />
+
+      case 'CBZ':
+      case 'CBR':
+        return <ComicReader filePath={currentBook.path} format={currentBook.format.toUpperCase() as 'CBZ' | 'CBR'}
+          onClose={() => setCurrentView('library')}
+          onPageChange={(page, total) => {
+            const progress = Math.round((page / total) * 100)
+            updateBookProgress(currentBook.id, progress, page)
+            useAppStore.getState().setReadingPosition({ page, percent: progress })
+          }}
+          initialPage={currentBook.currentPage || undefined} />
 
       default:
         return <ReaderView book={currentBook} />

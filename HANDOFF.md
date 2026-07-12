@@ -2,79 +2,80 @@
 
 > 下个会话先读此文件，快速恢复上下文。
 
-## 当前状态
+## 当前状态 (2026-07-12)
 
-EPUB/TXT/PDF 三个核心阅读器已稳定，TOC 导航、进度恢复、书签三大 bug 已修复。
+EPUB/TXT/PDF 三个核心阅读器稳定。MOBI/AZW3 阅读器已集成 Koodo Reader 解析引擎，MOBI6 (PalmDOC) 基本可用，HUFF/CDIC 格式（"权力"等）仍然严重乱码。CBZ 可用，CBR 未实测。
 
 ## 启动方式
 
 双击 `Scroll.vbs`（跑 `out/` 构建产物）。
-
-每次改完代码后必须 `npx electron-vite build` 才能生效。
+每次改完代码必须 `npx electron-vite build`。
 
 ## 关键文件速查
 
 | 文件 | 作用 |
 |------|------|
-| `src/renderer/src/components/reader/EpubReader.tsx` | EPUB 阅读器，全量渲染，~190 行 |
+| `src/renderer/src/components/reader/EpubReader.tsx` | EPUB 阅读器，全量渲染 |
 | `src/renderer/src/components/reader/TxtReader.tsx` | TXT 阅读器 |
-| `src/renderer/src/components/reader/PdfReader.tsx` | PDF 阅读器（不动） |
-| `src/renderer/src/lib/epubParser.ts` | EPUB 解析：JSZip + DOMParser NCX |
+| `src/renderer/src/components/reader/PdfReader.tsx` | PDF 阅读器 |
+| `src/renderer/src/components/reader/MobiReader.tsx` | MOBI/AZW3 阅读器 |
+| `src/renderer/src/components/reader/ComicReader.tsx` | CBZ/CBR 漫画阅读器 |
+| `src/renderer/src/lib/epubParser.ts` | EPUB 解析（JSZip + DOMParser NCX） |
+| `src/renderer/src/lib/mobiParser.ts` | MOBI/AZW3 解析（Koodo Reader 引擎移植） |
+| `src/renderer/src/lib/comicParser.ts` | CBZ/CBR 解析 |
 | `src/renderer/src/lib/txtParser.ts` | TXT 正则分章 |
 | `src/renderer/src/stores/appStore.ts` | Zustand 全局状态 |
 | `src/renderer/src/App.tsx` | 根组件，路由，TOC 生命周期 |
-| `src/renderer/src/components/layout/TocPanel.tsx` | 目录面板（递归树状渲染） |
-| `src/renderer/src/components/layout/BookmarkPanel.tsx` | 书签面板 |
 | `src/main/index.ts` | Electron 主进程 + IPC |
-| `src/main/storage.ts` | JSON 文件存储 |
 
-## 架构红线（不可违背）
+## 架构红线
 
-1. **不做虚拟章节/懒加载。** 所有内容全量渲染。不要用 placeholder、IntersectionObserver、scroll-based activation。
-2. **NCX 用 DOMParser，禁正则。** `new DOMParser().parseFromString(xml)` + `:scope > navPoint` 递归。
-3. **兄弟组件通信用 callback ref + Zustand 存 DOM。** 不要用 useEffect/useLayoutEffect/模块 ref 传函数。
-4. **TOC href 必须支持 fragment。** 从 href 提取 `#xxx`，在章节 DOM 内 `querySelector` 定位。
-5. **进度恢复用 scrollTop 百分比 + 章节 fallback + 重试。**
+1. **不做虚拟章节/懒加载** — 全量渲染
+2. **NCX 用 DOMParser，禁正则**
+3. **兄弟组件通信用 callback ref + Zustand 存 DOM**
+4. **TOC href 必须支持 fragment**
+5. **进度恢复用 scrollTop 百分比 + 重试**
 
-## 已实现功能
+## MOBI/AZW3 解析详细状态
 
-- EPUB 阅读：全量渲染、树状 TOC（fragment 跳转）、进度恢复
-- TXT 阅读：全量渲染、正则分章 TOC、进度恢复
-- PDF 阅读：pdf.js canvas
-- 书签：添加/删除/持久化/点击跳转
-- 书架：导入/展示/进度条/删除
-- AI 聊天面板（OpenAI 兼容）
-- 音乐播放器（Web Audio API）
-- 暗色/亮色主题
-- 中英文 i18n
+### 解析引擎来源
+移植自 Koodo Reader（`koodo-reader/kookit/src/libs/mobi.js`，GPL v3）。
 
-## 下一步（按优先级）
+### 支持的压缩格式
+| 压缩类型 | 值 | 处理方式 | 状态 |
+|----------|-----|---------|------|
+| 无压缩 | 1 | 直接拼接原始字节 | ❌ 不可用 |
+| PalmDOC LZ77 | 2 | Koodo 引擎的 `decompressPalmDOC` | ⚠️ 基本可用 |
+| HUFF/CDIC | 17480 | 自实现的 `huffUnpackData` | ❌ 严重乱码 |
 
-1. **阅读主题系统** — 5 套（亮/纸/护眼/暗/自然）+ 5 种字体（宋/黑/楷/系统/等宽），字体打包进 `resources/fonts/`
-2. **书籍封面提取** — EPUB 内嵌图片→base64 存 storage，PDF 首页缩略图，TXT 自动生成
-3. **豆瓣评分集成** — 首次导入询问，全手动刷新 + "全部刷新"按钮，精确匹配/其他版本（橙色）/手动输入
-4. **MOBI/AZW3 阅读引擎** — 自研纯 JS 解析器
-5. **CBZ/CBR 漫画**
+### 数据处理策略
+1. 读取 MOBI header 的 `trailingFlags`（offset 0xF0）
+2. 若 `trailingFlags` 有效（非 0xFFFFFFFF 且非 0）→ 逐 record 清理尾部条目后独立解压
+3. 若无有效 `trailingFlags` → 拼接所有 record 后一次性解压
+4. 解压后：KF8 多文档拆分 + HTML 清理 + `�` 去除
 
-详细设计见 `docs/06-refactor-design.md` 已删除，内容整合进了 `CLAUDE.md`。
+### 已知问题
+1. **HUFF/CDIC 解压乱码** — `huffUnpackData` 实现有 bug，输出内容不可读
+2. **PalmDOC 偶发 HTML 标签断裂** — `<table>` 变成 `lass="...">`，因解压残留 null 字节
+3. **MOBI v7（无压缩格式）不支持** — "掌控习惯"等文件直接乱码
+4. **`getUint` 边界问题** — 1 字节 uint 字段（如 `localeRegion`）需特殊处理
 
-## 今日踩过的坑
+## 踩过的坑（MOBI/AZW3 开发日志）
 
-| # | 坑 | 结论 |
-|---|-----|------|
-| 1 | 虚拟章节渲染 | 全量渲染，电子书不大 |
-| 2 | NCX 正则解析 | DOMParser 递归 |
-| 3 | 模块 ref 通信 | callback ref + Zustand DOM |
-| 4 | Fragment 未支持 | 提取 #fragment + querySelector |
-| 5 | scrollIntoView 不可靠 | scrollTop 百分比计算 |
-| 6 | useEffect 注册函数 | callback ref 在 commit 阶段 |
+### 坑 1：PalmDOC 算法反复试错
+从 PalmDOC LZ77 开始自研实现 → 对照 calibre C 源码修正 → 发现 `0xC0-0xFF` 是空格压缩而非 LZ77 长格式 → 对照 Koodo minified JS 微调 → 始终有边缘乱码。**结论：二进制格式解析不要从零实现，直接移植成熟方案。**
 
-详见 `CLAUDE.md`、`docs/02-architecture-decisions.md`、`memory/*.md`。
+### 坑 2：Koodo 引擎集成
+移植后发现 `trailingFlags=0xFFFFFFFF`（很多 AZW3 文件的默认值）被错误解析为 31 个 trailing entries，删除了大量正常数据。**修复：** 0xFFFFFFFF 视为 0。
 
-## Git
+### 坑 3：`getUint` 对 2 字节字段的崩溃
+`getUint` 函数读取 uint32，但 MOBI header 有 2 字节和 1 字节的 uint 字段。**修复：** 根据字段 size 自动选择 `getUint32`/`getUint16`/直接读 byte。
 
-```bash
-git log --oneline  # 查看提交历史
-```
+### 坑 4：`resourceStart` 误解
+`mobi.resourceStart`（offset 0x6C）是第一张图片的索引，不是文本记录数。正确做法是用 PalmDOC header 的 `numTextRecords`。
 
-最后提交：`d8ce27e docs: reorganize documentation and finalize bug fixes`
+### 坑 5：HUFF/CDIC record 搜索
+KF8 文件的 HUFF/CDIC 记录在文本记录之后（不在 `firstNonBook + 20` 范围内）。**修复：** 全文件搜索。
+
+## 自测文件
+测试书籍目录：`D:\10_Books\05_人文艺术与生活类`（48 本，含 mobi/azw3/epub/pdf）。仅复制用于测试，不得修改或删除原始文件。

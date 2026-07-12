@@ -20,13 +20,13 @@ const zh = {
 
   // Reader
   'reader.placeholder.title': '阅读器引擎开发中',
-  'reader.placeholder.desc': '当前为阅读器占位组件。后续将依次集成：',
+  'reader.placeholder.desc': '当前为阅读器占位组件。已支持的格式：',
   'reader.placeholder.pdf': 'PDF 渲染 — pdf.js',
-  'reader.placeholder.epub': 'EPUB 渲染 — epub.js',
-  'reader.placeholder.mobi': 'MOBI/AZW3 解析',
+  'reader.placeholder.epub': 'EPUB 渲染 — JSZip 自研解析器',
+  'reader.placeholder.mobi': 'MOBI/AZW3 — 自研 PalmDOC 解析器',
   'reader.placeholder.txt': 'TXT/Markdown 章节分章',
-  'reader.placeholder.cbz': 'CBZ/CBR 漫画浏览',
-  'reader.placeholder.djvu': 'DJVU 支持',
+  'reader.placeholder.cbz': 'CBZ/CBR — 漫画浏览引擎',
+  'reader.placeholder.djvu': 'DJVU — 待实现',
   'reader.back': '按 Esc 返回书架',
 
   // AI Panel

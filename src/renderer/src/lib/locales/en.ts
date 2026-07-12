@@ -19,13 +19,13 @@ const en: Translations = {
   'library.unknownAuthor': 'Unknown Author',
 
   'reader.placeholder.title': 'Reader Engine Under Development',
-  'reader.placeholder.desc': 'This is a placeholder. The following engines will be integrated:',
+  'reader.placeholder.desc': 'Supported formats:',
   'reader.placeholder.pdf': 'PDF rendering — pdf.js',
-  'reader.placeholder.epub': 'EPUB rendering — epub.js',
-  'reader.placeholder.mobi': 'MOBI/AZW3 parsing',
+  'reader.placeholder.epub': 'EPUB rendering — custom JSZip parser',
+  'reader.placeholder.mobi': 'MOBI/AZW3 — custom PalmDOC parser',
   'reader.placeholder.txt': 'TXT/Markdown chapter detection',
-  'reader.placeholder.cbz': 'CBZ/CBR comic viewer',
-  'reader.placeholder.djvu': 'DJVU support',
+  'reader.placeholder.cbz': 'CBZ/CBR — comic viewer engine',
+  'reader.placeholder.djvu': 'DJVU — coming soon',
   'reader.back': 'Press Esc to return to library',
 
   'ai.notConfigured': 'AI Assistant not configured',
