@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import { parseEpub, type EpubContent, type TocItem } from '../../lib/epubParser'
 import { useAppStore } from '../../stores/appStore'
+import ReaderThemeBar from './ReaderThemeBar'
 import { useI18n } from '../../lib/i18n'
 
 interface Props {
@@ -196,6 +197,7 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
           ← {t('app.backToLibrary')}
         </button>
         <span className="text-xs text-gray-400 truncate max-w-[300px]">{title}</span>
+          <ReaderThemeBar />
         <div className="flex items-center gap-3">
           <button onClick={decreaseFont}
             className="p-1 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
