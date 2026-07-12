@@ -68,47 +68,77 @@ function getVarLenFromEnd(array: Uint8Array): number {
 
 function huffcdicLoad(reader: any, huffRecord: Uint8Array, cdicRecords: Uint8Array[]): void {
   const h = getStruct(HUFF_HEADER, huffRecord)
-  reader.dict1 = Array.from({ length: 256 }, (_, i) => h.offset1 + 4 * i)
+  // table1: indexed by top 8 bits of Huffman code
+  reader.table1 = Array.from({ length: 256 }, (_, i) => h.offset1 + 4 * i)
     .map(off => off + 4 <= huffRecord.length ? getUint(huffRecord.slice(off, off + 4)) : 0)
     .map((v: number) => [!!(v & 0x80), v & 0x1F, v >>> 8])
+  // table2: indexed by code length (1-32), each [mincode, value]
+  const t2: [number, number][] = []
+  for (let i = 0; i < 32; i++) {
+    const off = h.offset2 + i * 8
+    if (off + 8 <= huffRecord.length) {
+      t2.push([getUint(huffRecord.slice(off, off + 4)), getUint(huffRecord.slice(off + 4, off + 8))])
+    } else {
+      t2.push([0, 0])
+    }
+  }
+  reader.table2 = t2
+  // Build dictionary from CDIC records
   for (const cdicRecord of cdicRecords) {
     const c = getStruct(CDIC_HEADER, cdicRecord)
     if (c.magic !== 'CDIC') continue
     const n = Math.min(1 << c.codeLength, c.numEntries - (reader.dictionary?.length ?? 0))
+    const buffer = cdicRecord.slice(c.length as number) // data starts after header
     for (let i = 0; i < n; i++) {
-      const idx = 16 + 2 * i; if (idx + 2 > cdicRecord.length) continue
-      const off = getUint(cdicRecord.slice(idx, idx + 2)) & 0xFFFF
-      const blenIdx = 16 + off; if (blenIdx + 2 > cdicRecord.length) continue
-      const blen = getUint(cdicRecord.slice(blenIdx, blenIdx + 2)) & 0xFFFF
-      const len = blen & 0x7FFF; const flag = blen & 0x8000
-      const dataStart = 18 + off; if (dataStart + len > cdicRecord.length) continue
-      reader.dictionary.push(cdicRecord.slice(dataStart, dataStart + len))
-      reader.dictionaryFlags.push(flag)
+      const offset = getUint(buffer.slice(i * 2, i * 2 + 2))
+      if (offset + 2 > buffer.length) continue
+      const x = getUint(buffer.slice(offset, offset + 2))
+      const len = x & 0x7FFF; const decompressed = x & 0x8000
+      if (offset + 2 + len > buffer.length) continue
+      const value = buffer.slice(offset + 2, offset + 2 + len)
+      reader.dictionary.push([value, decompressed])
     }
   }
 }
 
+// Koodo Reader's exact bit reader: read 32-bit window at given bit position
+function read32Bits(byteArray: Uint8Array, from: number): bigint {
+  const startByte = from >>> 3
+  const end = from + 32
+  const endByte = end >>> 3
+  let bits = 0n
+  for (let i = startByte; i <= endByte; i++)
+    bits = (bits << 8n) | BigInt(byteArray[i] ?? 0)
+  return (bits >> (8n - BigInt(end & 7))) & 0xFFFFFFFFn
+}
+
+// Koodo Reader's exact Huffman decoder: table1 + table2 + dictionary
 function huffUnpackData(reader: any, data: Uint8Array, depth: number = 0): Uint8Array {
-  if (depth > 5) return new Uint8Array(0)
-  const padded = new Uint8Array(data.length + 8); padded.set(data)
-  const q = new DataView(padded.buffer, padded.byteOffset, padded.length)
+  if (depth > 10) return new Uint8Array(0) // safety: max recursion depth
   const output: number[] = []
-  let pos = 0, x = q.getBigUint64(pos, false), n = 32, bitsLeft = data.length * 8
-  while (bitsLeft >= 0) {
-    if (n <= 0) { pos += 4; x = q.getBigUint64(pos, false); n += 32 }
-    const code = Number(x >> BigInt(n))
-    const top8 = (code >>> 24) & 0xFF
-    const [term, codelen, maxcodeRaw] = reader.dict1[top8] || [1, 1, 0]
-    let maxcode = ((maxcodeRaw + 1) << (32 - codelen)) - 1
-    n -= codelen; bitsLeft -= codelen
-    if (bitsLeft < 0) break
-    const r = (maxcode - code) >>> (32 - codelen)
-    if (r < 0 || r >= (reader.dictionary?.length ?? 0)) continue
-    const entry = reader.dictionary[r], flag = reader.dictionaryFlags?.[r]
-    if (entry) {
-      if (flag) { for (let j = 0; j < entry.length; j++) output.push(entry[j]) }
-      else { reader.dictionary[r] = null; const nested = huffUnpackData(reader, entry, depth + 1); reader.dictionary[r] = nested; reader.dictionaryFlags[r] = 0x8000; for (let j = 0; j < nested.length; j++) output.push(nested[j]) }
+  const bitLength = data.byteLength * 8
+  let i = 0
+  while (i < bitLength) {
+    const bits = Number(read32Bits(data, i))
+    let [found, codeLength, value] = reader.table1[bits >>> 24]
+    if (!found) {
+      // Use table2 to find the correct code length
+      const t2 = reader.table2
+      while (codeLength < 32 && (bits >>> (32 - codeLength)) < (t2[codeLength - 1]?.[0] ?? 0))
+        codeLength += 1
+      value = t2[codeLength - 1]?.[1] ?? 0
     }
+    if ((i += codeLength) > bitLength) break
+
+    const code = value - (bits >>> (32 - codeLength))
+    if (code < 0 || code >= reader.dictionary.length) continue
+    let [result, decompressed] = reader.dictionary[code]
+    if (!decompressed) {
+      // Non-terminal: recursively decompress and cache
+      result = huffUnpackData(reader, result, depth + 1)
+      reader.dictionary[code] = [result, true]
+    }
+    for (let j = 0; j < result.length; j++) output.push(result[j])
   }
   return new Uint8Array(output)
 }
@@ -206,7 +236,10 @@ export async function parseMobi(base64Data: string): Promise<MobiContent> {
   const allOutput: number[] = []
 
   if (compression === 17480) {
-    // Search entire file for HUFF and CDIC records (KF8 files store them after text records)
+    // Search entire file for HUFF and CDIC records
+    // Note: HUFF/CDIC records may be in the resource section (after resourceStart),
+    // but the actual Huffman-encoded text records are in the standard text range
+    // (firstTextIdx..lastTextIdx), NOT in the resource section
     let huffRecord: Uint8Array | null = null
     const cdicRecords: Uint8Array[] = []
     for (let ri = 0; ri < numRecords; ri++) {
@@ -216,10 +249,24 @@ export async function parseMobi(base64Data: string): Promise<MobiContent> {
       if (tag === 'HUFF') huffRecord = data; else if (tag === 'CDIC') cdicRecords.push(data)
     }
     if (!huffRecord) throw new Error('HUFF/CDIC: HUFF record not found')
-    const reader: any = { dictionary: [], dictionaryFlags: [] }
+
+    const reader: any = { dictionary: [] }
     huffcdicLoad(reader, huffRecord, cdicRecords)
+
+    // Decode text records: strip trailing bytes first, then Huffman-decode
     for (let ri = firstTextIdx; ri < lastTextIdx; ri++) {
-      const decoded = huffUnpackData(reader, readRecord(ri))
+      let data = readRecord(ri)
+      // Strip trailing data (Koodo does this)
+      for (let k = 0; k < numTrailing; k++) {
+        const l = getVarLenFromEnd(data)
+        if (l > 0 && l <= data.length) data = data.slice(0, -l)
+      }
+      if (multibyte && data.length > 0) {
+        const m = (data[data.length - 1] & 3) + 1
+        if (m > 0 && m < data.length) data = data.slice(0, -m)
+      }
+      if (data.length === 0) continue
+      const decoded = huffUnpackData(reader, data)
       for (let j = 0; j < decoded.length; j++) allOutput.push(decoded[j])
     }
   } else if (compression === 2) {
@@ -238,19 +285,37 @@ export async function parseMobi(base64Data: string): Promise<MobiContent> {
       const decoded = decompressPalmDOC(new Uint8Array(concat))
       for (let j = 0; j < decoded.length; j++) allOutput.push(decoded[j])
     }
+  } else if (compression === 1) {
+    // No compression (MOBI v7)
+    for (let ri = firstTextIdx; ri < lastTextIdx; ri++) {
+      const data = readRecord(ri)
+      for (let j = 0; j < data.length; j++) allOutput.push(data[j])
+    }
+  } else if (compression !== 17480) {
+    // Fallback: try reading as raw text (no decompression)
+    for (let ri = firstTextIdx; ri < lastTextIdx; ri++) {
+      const data = readRecord(ri)
+      for (let j = 0; j < data.length; j++) allOutput.push(data[j])
+    }
   }
 
   let html = decode.decode(new Uint8Array(allOutput))
 
-  if (html.includes('<?xml')) {
-    const parts = html.split(/<\?xml[^?]*\?>/)
-    const bodies: string[] = []
-    for (const part of parts) {
-      let content = part.replace(/<\/?html[^>]*>/gi, '').replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '').trim()
-      if (content.length > 10) bodies.push(content)
-    }
-    if (bodies.length > 1) html = bodies.join('\n')
-  }
+  // Strip KF8 flow document wrappers: XML declarations, DOCTYPE, html/head/body tags
+  // KF8 content is multi-document; we want to keep all body content
+  html = html
+    .replace(/<\?xml[^?]*\?>/gi, '')               // XML declarations (may be garbled)
+    .replace(/<!DOCTYPE[^>]*>/gi, '')               // DOCTYPE
+    .replace(/<\/?html[^>]*>/gi, '')                // <html> / </html>
+    .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '')  // <head>...</head>
+    .replace(/<\/?body[^>]*>/gi, '')                // <body> / </body>
+
+  // Strip garbled KF8 flow document wrappers that survive XML/HTML tag cleanup
+  // These appear between flow docs as garbled <?xml>/<!DOCTYPE>/<html> tags
+  html = html
+    .replace(/<[^>]{0,200}?(?:html PUBLIC|DTD \w|xmlns=|www\.w3|DOCTYPE html|standal)[^>]{0,400}?>/gi, '')
+    // Strip leading garbage before the first real HTML tag
+    .replace(/^[\s\S]{0,200}?(?=<(?:h[1-6]|div|p[\s>]|a[\s>]))/i, '')
 
   html = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<mbp:pagebreak[^>]*\/?>/gi, '').replace(/<a[^>]*filepos=\d+[^>]*>[\s\S]*?<\/a>/gi, '').replace(/<a[^>]*>\s*<\/a>/gi, '').replace(/�/g, '').trim()
 
