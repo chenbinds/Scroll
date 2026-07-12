@@ -20,6 +20,7 @@ export default function App() {
 
   // Try Calibre conversion for MOBI/AZW3
   useEffect(() => {
+    setConvertedEpubPath(null) // clear old book's epub immediately
     if (!currentBook) return
     const fmt = currentBook.format.toUpperCase()
     if (fmt === 'MOBI' || fmt === 'AZW' || fmt === 'AZW3') {
