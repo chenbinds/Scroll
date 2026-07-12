@@ -334,6 +334,26 @@ export async function parseMobi(base64Data: string): Promise<MobiContent> {
     return `<img ${result}${cleaned}>`
   })
 
+  // ── KF8/AZW3 image extraction: convert kindle:embed:XXXX to base64 ──
+  // kindle:embed:0001 = first image after resourceStart (1-based)
+  html = html.replace(/src="kindle:embed:(\d+)(\?[^"]*)?"/gi, (_match, numStr: string) => {
+    const idx = parseInt(numStr, 10)
+    if (seenImages.has(`embed:${numStr}`)) return seenImages.get(`embed:${numStr}`)!
+    const recIdx = rs + idx
+    try {
+      const imgData = readRecord(recIdx)
+      if (imgData.length > 2 && ((imgData[0] === 0xFF && imgData[1] === 0xD8) || (imgData[0] === 0x89 && imgData[1] === 0x50))) {
+        let mime = imgData[0] === 0x89 ? 'image/png' : 'image/jpeg'
+        let binary = ''
+        for (let bi = 0; bi < imgData.length; bi++) binary += String.fromCharCode(imgData[bi])
+        const result = `src="data:${mime};base64,${btoa(binary)}"`
+        seenImages.set(`embed:${numStr}`, result)
+        return result
+      }
+    } catch (_) {}
+    return _match
+  })
+
   // Strip KF8 flow document wrappers: XML declarations, DOCTYPE, html/head/body tags
   // KF8 content is multi-document; we want to keep all body content
   html = html
@@ -368,7 +388,8 @@ export async function parseMobi(base64Data: string): Promise<MobiContent> {
     const fontH = /<font\s+size="7"\s*>\s*<b>([^<]+)<\/b>\s*<\/font>/gi
     while ((m = fontH.exec(html)) !== null) {
       const h = m[1].trim()
-      if (h && h.length >= 4 && h.length < 200 && !/^图\d/.test(h) && !/^\d+$/.test(h))
+      if (h && h.length >= 4 && h.length < 200 && !/^图\d/.test(h) && !/^\d+$/.test(h)
+          && !/table of contents/i.test(h) && !/^contents$/i.test(h))
         headingMatches.push({ pos: m.index, heading: h })
     }
   }
@@ -378,7 +399,8 @@ export async function parseMobi(base64Data: string): Promise<MobiContent> {
     const fontH2 = /<font\s+size="[56]"\s*>\s*<b>([^<]+)<\/b>\s*<\/font>/gi
     while ((m = fontH2.exec(html)) !== null) {
       const h = m[1].trim()
-      if (h && h.length >= 4 && h.length < 200 && !/^图\d/.test(h) && !/^\d+$/.test(h))
+      if (h && h.length >= 4 && h.length < 200 && !/^图\d/.test(h) && !/^\d+$/.test(h)
+          && !/table of contents/i.test(h) && !/^contents$/i.test(h))
         headingMatches.push({ pos: m.index, heading: h })
     }
   }
