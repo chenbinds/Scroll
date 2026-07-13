@@ -11,6 +11,14 @@ contextBridge.exposeInMainWorld('scrollAPI', {
 
   getDataPath: () => ipcRenderer.invoke('app:getDataPath'),
   setBackgroundColor: (color: string) => ipcRenderer.invoke('window:setBackgroundColor', color),
+  confirmClose: () => ipcRenderer.invoke('window:confirm-close'),
+  cancelClose: () => ipcRenderer.invoke('window:cancel-close'),
+  onCloseRequested: (cb: () => void) => {
+    const handler = () => cb()
+    ipcRenderer.on('app:close-requested', handler)
+    return () => ipcRenderer.removeListener('app:close-requested', handler)
+  },
+
   bootstrap: () => bootstrapPromise,
 
   aiChat: (params: AiChatParams) => ipcRenderer.invoke('ai:chat', params),
@@ -49,6 +57,9 @@ export interface ScrollAPI {
   readPath: (filePath: string) => Promise<string | null>
   getDataPath: () => Promise<string>
   setBackgroundColor: (color: string) => Promise<void>
+  confirmClose: () => Promise<boolean>
+  cancelClose: () => Promise<boolean>
+  onCloseRequested: (cb: () => void) => () => void
   bootstrap: () => Promise<{
     books: unknown[]
     bookmarks: unknown

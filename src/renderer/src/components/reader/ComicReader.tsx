@@ -3,6 +3,7 @@ import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, SkipBack, SkipForward } fro
 import { parseComic, type ComicPage } from '../../lib/comicParser'
 import { useAppStore } from '../../stores/appStore'
 import { useI18n } from '../../lib/i18n'
+import BackToLibraryButton from './BackToLibraryButton'
 
 interface Props {
   filePath: string
@@ -129,10 +130,7 @@ export default function ComicReader({ filePath, format, onClose, onPageChange, i
   return (
     <div className="reader-frame">
       <div className="reader-toolbar">
-        <button onClick={onClose}
-          className="text-sm chrome-muted hover:opacity-80 transition-colors">
-          ← {t('app.backToLibrary')}
-        </button>
+        <BackToLibraryButton onClick={onClose} />
 
         <div className="flex items-center gap-3">
           <span className="text-xs chrome-muted tabular-nums">{currentPage} / {pages.length}</span>

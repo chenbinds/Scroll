@@ -4,6 +4,7 @@ import { parseTxt, type TxtChapter } from '../../lib/txtParser'
 import { useAppStore } from '../../stores/appStore'
 import { useReaderFontSize } from '../../lib/useReaderFontSize'
 import ReaderThemeBar from './ReaderThemeBar'
+import BackToLibraryButton from './BackToLibraryButton'
 import { useI18n } from '../../lib/i18n'
 
 interface Props {
@@ -138,10 +139,7 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
   return (
     <div className="reader-frame">
       <div className="reader-toolbar">
-        <button onClick={onClose} className="text-sm chrome-muted hover:opacity-80 transition-colors">
-          ← {t('app.backToLibrary')}
-        </button>
-        <span className="text-xs chrome-muted truncate max-w-[300px]">{title}</span>
+        <BackToLibraryButton onClick={onClose} />
           <ReaderThemeBar />
           
         <div className="flex items-center gap-3">

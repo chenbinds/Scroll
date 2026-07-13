@@ -5,7 +5,13 @@ import { cleanBookTitle } from '../../lib/bookTitle'
 import { useAppStore } from '../../stores/appStore'
 import { useReaderFontSize } from '../../lib/useReaderFontSize'
 import ReaderThemeBar from './ReaderThemeBar'
-import { useI18n } from '../../lib/i18n'
+import BackToLibraryButton from './BackToLibraryButton'
+import AnnotationToolbar from './annotation/AnnotationToolbar'
+import AnnotationOverlay from './annotation/AnnotationOverlay'
+import HighlightLayer from './annotation/HighlightLayer'
+import MarkSelectionHandler from './annotation/MarkSelectionHandler'
+import { useAnnotationStore } from '../../stores/annotationStore'
+import { annotationFormatForBook } from '../../lib/annotationTypes'
 
 interface Props {
   filePath: string
@@ -19,7 +25,6 @@ interface Props {
 export type { TocItem }
 
 export default function EpubReader({ filePath, onClose, onProgress, onTocReady, initialChapterIndex, initialProgress }: Props) {
-  const { t } = useI18n()
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
   const [loading, setLoading] = useState(true)
@@ -28,6 +33,7 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
   const [epubContent, setEpubContent] = useState<EpubContent | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const hasRestoredRef = useRef(false)
+  const currentBook = useAppStore((s) => s.currentBook)
 
   // Callback ref: stores the DOM element in Zustand for TocPanel to use
   // Called during React's commit phase — before paint, no timing hole
@@ -40,6 +46,21 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
   useEffect(() => {
     return () => { useAppStore.getState().setToc([]) }
   }, [])
+
+  // Load annotations for current book
+  useEffect(() => {
+    if (!currentBook?.id) return
+    void useAnnotationStore.getState().loadForBook(
+      currentBook.id,
+      annotationFormatForBook(currentBook.format)
+    )
+    return () => { useAnnotationStore.getState().reset() }
+  }, [currentBook?.id, currentBook?.format])
+
+  const requestClose = useCallback(() => {
+    const canLeave = useAnnotationStore.getState().requestLeave('library')
+    if (canLeave) onClose()
+  }, [onClose])
 
   // Load EPUB
   useEffect(() => {
@@ -214,57 +235,67 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
     <div className="reader-frame">
       {/* Toolbar */}
       <div className="reader-toolbar">
-        <button onClick={onClose}
-          className="text-sm chrome-muted hover:opacity-80 transition-colors">
-          ← {t('app.backToLibrary')}
-        </button>
-        <span className="text-xs chrome-muted truncate max-w-[300px]">{title}</span>
+        <div className="flex items-center gap-2 min-w-0 shrink">
+          <BackToLibraryButton onClick={requestClose} />
+        </div>
+        <AnnotationToolbar />
+        <div className="flex items-center gap-2 shrink-0">
           <ReaderThemeBar />
-          
-        <div className="flex items-center gap-3">
-          <button onClick={decreaseFont}
-            className="p-1 chrome-muted hover:opacity-80 transition-colors">
-            <ZoomOut size={16} />
-          </button>
-          <span className="text-xs chrome-muted tabular-nums w-10 text-center">{fontSize}%</span>
-          <button onClick={increaseFont}
-            className="p-1 chrome-muted hover:opacity-80 transition-colors">
-            <ZoomIn size={16} />
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={decreaseFont}
+              className="p-1 chrome-muted hover:opacity-80 transition-colors">
+              <ZoomOut size={16} />
+            </button>
+            <span className="text-xs chrome-muted tabular-nums w-10 text-center">{fontSize}%</span>
+            <button onClick={increaseFont}
+              className="p-1 chrome-muted hover:opacity-80 transition-colors">
+              <ZoomIn size={16} />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Content — full render, callback ref stores DOM el for TocPanel */}
-      <div ref={setContentRef} className="reader-scroll scrollbar-thin">
-        {loading && (
-          <div className="flex items-center justify-center h-full">
-            <div className="flex gap-1.5">
-              <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+      {/* Content + viewport annotation canvas (siblings — EPUB DOM untouched) */}
+      <div className="relative flex-1 min-h-0">
+        <div ref={setContentRef} className="reader-scroll scrollbar-thin absolute inset-0">
+          {loading && (
+            <div className="flex items-center justify-center h-full">
+              <div className="flex gap-1.5">
+                <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {error && (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center text-red-500 px-4">
-              <p className="text-sm">Failed to load EPUB</p>
-              <p className="text-xs mt-1 text-red-400">{error}</p>
+          {error && (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center text-red-500 px-4">
+                <p className="text-sm">Failed to load EPUB</p>
+                <p className="text-xs mt-1 text-red-400">{error}</p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {!loading && !error && chapterElements && (
-          <div className="max-w-4xl mx-auto px-8 py-6 reader-content" style={{ fontSize: `${fontSize}%` }}>
-            <h1 className="text-2xl font-bold mb-2 text-center">{title}</h1>
-            {author && author !== 'Unknown Author' && (
-              <p className="text-sm text-center chrome-muted mb-8">{author}</p>
-            )}
-            <div className={author && author !== 'Unknown Author' ? '' : 'mt-6'}>
-              {chapterElements}
+          {!loading && !error && chapterElements && (
+            <div className="max-w-4xl mx-auto px-8 py-6 reader-content" style={{ fontSize: `${fontSize}%` }}>
+              <h1 className="text-2xl font-bold mb-2 text-center">{title}</h1>
+              {author && author !== 'Unknown Author' && (
+                <p className="text-sm text-center chrome-muted mb-8">{author}</p>
+              )}
+              <div className={author && author !== 'Unknown Author' ? '' : 'mt-6'}>
+                {chapterElements}
+              </div>
             </div>
-          </div>
+          )}
+        </div>
+
+        {!loading && !error && (
+          <>
+            <HighlightLayer scrollRef={contentRef} />
+            <AnnotationOverlay scrollRef={contentRef} />
+            <MarkSelectionHandler scrollRef={contentRef} />
+          </>
         )}
       </div>
     </div>

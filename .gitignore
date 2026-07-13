@@ -69,3 +69,8 @@ tmp/
 temp/
 tools/
 calibre-portable/
+
+# electron-vite / 调试残留
+electron.vite.config.*.mjs
+scripts/boot-*.txt
+scripts/test-douban*.mjs

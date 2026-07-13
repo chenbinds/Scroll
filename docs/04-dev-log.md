@@ -148,3 +148,21 @@
 - ✅ PDF 阅读（pdf.js、页码进度）
 - ✅ 书签（持久化、点击跳转）
 - 📋 待做：阅读主题、封面、豆瓣评分、MOBI/AZW3
+
+---
+
+## 2026-07-13 — 阅读标注 + 多格式 + 工程收口
+
+### 标注功能
+- 顶栏：标记 / 画笔（8 图形）/ 橡皮擦 / 手动保存
+- 视口级兄弟 canvas；归一化坐标；独立 `annotations_{bookId}` JSON
+- 离开统一 React 弹窗（书架 / Esc / 窗口 X）；禁止 MessageBox 双轨
+- EPUB + MOBI/AZW/AZW3 全套；PDF 画笔/橡皮（标记禁用）
+- 笔记弹窗字数上限 1000；fixed 定位防裁切
+- 阅读工具栏去掉书名；「返回书架」改为醒目按钮
+
+### 工程整理
+- 清理 vite 临时配置、boot 日志、豆瓣临时脚本、`copy_calibre.bat`、旧 `info/` 调研
+- Handoff 归档至 `Information/archive/`；现行 `Information/Handoff_标注_2026-07-13.md`
+- 新增根目录 `TODO.md`（音乐 / AI / 标注后续 / DJVU 等）
+- 更新 `HANDOFF.md`、`CLAUDE.md`、`.gitignore`

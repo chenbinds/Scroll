@@ -10,7 +10,7 @@ interface Props {
 export default function TopBar({ onOpenSettings }: Props) {
   const { t } = useI18n()
   const {
-    currentView, darkMode, toggleDarkMode, currentBook, setCurrentView,
+    currentView, darkMode, toggleDarkMode,
     leftSidebarOpen, leftSidebarTab, toggleLeftSidebar,
     rightSidebarOpen, toggleRightSidebar
   } = useAppStore()
@@ -23,27 +23,11 @@ export default function TopBar({ onOpenSettings }: Props) {
         : 'bg-white dark:bg-gray-950 border-b border-gray-300 dark:border-gray-700'
     }`}>
       <div className="flex items-center gap-3">
-        {currentView === 'reader' && (
-          <button
-            onClick={() => setCurrentView('library')}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-          >
-            <Book size={16} />
-            <span>{t('app.backToLibrary')}</span>
-          </button>
-        )}
-
         {currentView === 'library' && (
           <h1 className="text-base font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <Book size={18} className="text-scroll-500" />
             {t('app.title')}
           </h1>
-        )}
-
-        {currentView === 'reader' && currentBook && (
-          <span className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[400px]">
-            {currentBook.title}
-          </span>
         )}
       </div>
 

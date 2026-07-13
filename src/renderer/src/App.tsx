@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import AppShell from './components/layout/AppShell'
 import { useAppStore } from './stores/appStore'
+import { useAnnotationStore } from './stores/annotationStore'
 import { getThemeCssVars } from './lib/readingTheme'
 import { cleanBookTitle } from './lib/bookTitle'
 import { isBootstrapHydrated } from './bootstrapHydrate'
+import UnsavedAnnotationsDialog from './components/reader/annotation/UnsavedAnnotationsDialog'
 
 const LibraryView = lazy(() => import('./components/library/LibraryView'))
 
@@ -50,6 +52,37 @@ export default function App() {
     document.documentElement.classList.toggle('dark', darkMode)
     window.scrollAPI.setBackgroundColor(darkMode ? '#111827' : '#f8fafc').catch(() => {})
   }, [darkMode])
+
+  // Unified leave: window X → same React dialog as 返回书架
+  useEffect(() => {
+    return window.scrollAPI.onCloseRequested(() => {
+      const canLeave = useAnnotationStore.getState().requestLeave('quit')
+      if (canLeave) {
+        void window.scrollAPI.confirmClose()
+      }
+    })
+  }, [])
+
+  const pendingLeave = useAnnotationStore((s) => s.pendingLeave)
+
+  const handleLeaveSave = useCallback(async () => {
+    const target = await useAnnotationStore.getState().resolveLeave('save')
+    if (!target) return
+    if (target === 'quit') void window.scrollAPI.confirmClose()
+    else setCurrentView('library')
+  }, [setCurrentView])
+
+  const handleLeaveDiscard = useCallback(async () => {
+    const target = await useAnnotationStore.getState().resolveLeave('discard')
+    if (!target) return
+    if (target === 'quit') void window.scrollAPI.confirmClose()
+    else setCurrentView('library')
+  }, [setCurrentView])
+
+  const handleLeaveCancel = useCallback(() => {
+    useAnnotationStore.getState().cancelLeave()
+    void window.scrollAPI.cancelClose()
+  }, [])
 
   const readingTheme = useAppStore((s) => s.readingTheme)
   const readingFont = useAppStore((s) => s.readingFont)
@@ -163,7 +196,20 @@ export default function App() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key === 'S') { e.preventDefault(); setShowSettings(true) }
-      if (e.key === 'Escape' && currentView === 'reader') setCurrentView('library')
+      if (e.key === 'Escape' && currentView === 'reader') {
+        e.preventDefault()
+        const store = useAnnotationStore.getState()
+        // Leave dialog open → Esc cancels (same as 取消)
+        if (store.pendingLeave) {
+          store.cancelLeave()
+          void window.scrollAPI.cancelClose()
+          return
+        }
+        // Polyline/polygon draft → Esc cancels draft only (Phase S leave still via 返回/X)
+        if (store.hasClickDraft) return
+        const canLeave = store.requestLeave('library')
+        if (canLeave) setCurrentView('library')
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
@@ -244,6 +290,12 @@ export default function App() {
           <SettingsDialog onClose={() => setShowSettings(false)} />
         </Suspense>
       )}
+      <UnsavedAnnotationsDialog
+        open={pendingLeave !== null}
+        onSave={() => { void handleLeaveSave() }}
+        onDiscard={() => { void handleLeaveDiscard() }}
+        onCancel={handleLeaveCancel}
+      />
     </AppShell>
   )
 }

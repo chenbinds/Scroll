@@ -2,8 +2,13 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
 import { useAppStore } from '../../stores/appStore'
+import { useAnnotationStore } from '../../stores/annotationStore'
+import { annotationFormatForBook } from '../../lib/annotationTypes'
+import AnnotationToolbar from './annotation/AnnotationToolbar'
+import AnnotationOverlay from './annotation/AnnotationOverlay'
+import HighlightLayer from './annotation/HighlightLayer'
+import BackToLibraryButton from './BackToLibraryButton'
 import ReaderThemeBar from './ReaderThemeBar'
-import { useI18n } from '../../lib/i18n'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -20,7 +25,6 @@ interface Props {
 }
 
 export default function PdfReader({ filePath, onClose, onPageChange, initialPage }: Props) {
-  const { t } = useI18n()
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null)
   const [pageCount, setPageCount] = useState(0)
   const [scale, setScale] = useState(1.5)
@@ -31,6 +35,19 @@ export default function PdfReader({ filePath, onClose, onPageChange, initialPage
   const coverCapturedRef = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const observerRef = useRef<IntersectionObserver | null>(null)
+  const currentBook = useAppStore((s) => s.currentBook)
+
+  // Annotations (brush/eraser; mark disabled for PDF canvas)
+  useEffect(() => {
+    if (!currentBook?.id) return
+    void useAnnotationStore.getState().loadForBook(currentBook.id, annotationFormatForBook(currentBook.format))
+    return () => { useAnnotationStore.getState().reset() }
+  }, [currentBook?.id, currentBook?.format])
+
+  const requestClose = useCallback(() => {
+    const canLeave = useAnnotationStore.getState().requestLeave('library')
+    if (canLeave) onClose()
+  }, [onClose])
 
   // Load PDF
   useEffect(() => {
@@ -231,62 +248,70 @@ export default function PdfReader({ filePath, onClose, onPageChange, initialPage
   return (
     <div className="reader-frame">
       <div className="reader-toolbar">
-        <button onClick={onClose}
-          className="text-sm chrome-muted hover:opacity-80 transition-colors">
-          ← {t('app.backToLibrary')}
-        </button>
-
-        <div className="flex items-center gap-3">
-          <button onClick={zoomOut}
-            className="p-1 chrome-muted hover:opacity-80 transition-colors">
-            <ZoomOut size={16} />
-          </button>
-          <span className="text-xs chrome-muted tabular-nums w-10 text-center">
-            {Math.round(scale * 100)}%
-          </span>
-          <button onClick={zoomIn}
-            className="p-1 chrome-muted hover:opacity-80 transition-colors">
-            <ZoomIn size={16} />
-          </button>
+        <div className="flex items-center gap-2 min-w-0 shrink">
+          <BackToLibraryButton onClick={requestClose} />
         </div>
-
-        <div className="w-16" />
+        <AnnotationToolbar />
+        <div className="flex items-center gap-2 shrink-0">
+          <ReaderThemeBar />
+          <div className="flex items-center gap-3">
+            <button onClick={zoomOut}
+              className="p-1 chrome-muted hover:opacity-80 transition-colors">
+              <ZoomOut size={16} />
+            </button>
+            <span className="text-xs chrome-muted tabular-nums w-10 text-center">
+              {Math.round(scale * 100)}%
+            </span>
+            <button onClick={zoomIn}
+              className="p-1 chrome-muted hover:opacity-80 transition-colors">
+              <ZoomIn size={16} />
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Scrollable content */}
-      <div ref={containerRef}
-        className="reader-scroll scrollbar-thin">
-        {loading && (
-          <div className="flex items-center justify-center h-full">
-            <div className="flex gap-1.5">
-              <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+      <div className="relative flex-1 min-h-0">
+        <div ref={containerRef}
+          className="reader-scroll scrollbar-thin absolute inset-0">
+          {loading && (
+            <div className="flex items-center justify-center h-full">
+              <div className="flex gap-1.5">
+                <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {error && (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center text-red-500">
-              <p className="text-sm">{error}</p>
-              <button onClick={onClose} className="mt-3 text-xs text-scroll-500 hover:underline">
-                Back to library
-              </button>
+          {error && (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center text-red-500">
+                <p className="text-sm">{error}</p>
+                <button onClick={requestClose} className="mt-3 text-xs text-scroll-500 hover:underline">
+                  Back to library
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {!loading && !error && Array.from({ length: pageCount }, (_, i) => i + 1).map((pageNum) => (
-          <div key={pageNum} data-page={pageNum}
-            className="flex justify-center py-2">
-            <canvas
-              ref={(el) => setCanvasRef(pageNum, el)}
-              data-page={pageNum}
-              className="shadow-lg bg-white"
-            />
-          </div>
-        ))}
+          {!loading && !error && Array.from({ length: pageCount }, (_, i) => i + 1).map((pageNum) => (
+            <div key={pageNum} data-page={pageNum}
+              className="flex justify-center py-2">
+              <canvas
+                ref={(el) => setCanvasRef(pageNum, el)}
+                data-page={pageNum}
+                className="shadow-lg bg-white"
+              />
+            </div>
+          ))}
+        </div>
+
+        {!loading && !error && pageCount > 0 && (
+          <>
+            <HighlightLayer scrollRef={containerRef} layoutKey={scale} />
+            <AnnotationOverlay scrollRef={containerRef} layoutKey={scale} />
+          </>
+        )}
       </div>
     </div>
   )

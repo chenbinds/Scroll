@@ -18,9 +18,15 @@ const bootStarted = Date.now()
 registerCoverSchemePrivileged()
 
 let mainWindow: BrowserWindow | null = null
+/** When true, the next close event proceeds without prompting */
+let allowClose = false
+/** True while waiting for renderer leave dialog — ignore repeat X clicks */
+let awaitingLeaveDecision = false
 
 function createWindow(): void {
   console.log(`[scroll] createWindow +${Date.now() - bootStarted}ms`)
+  allowClose = false
+  awaitingLeaveDecision = false
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -38,6 +44,15 @@ function createWindow(): void {
       backgroundThrottling: false,
       v8CacheOptions: 'bypassHeatCheck'
     }
+  })
+
+  // Unified leave: renderer shows React UnsavedAnnotationsDialog
+  mainWindow.on('close', (e) => {
+    if (allowClose) return
+    e.preventDefault()
+    if (awaitingLeaveDecision) return
+    awaitingLeaveDecision = true
+    mainWindow?.webContents.send('app:close-requested')
   })
 
   mainWindow.webContents.on('did-finish-load', () => {
@@ -65,6 +80,22 @@ ipcMain.handle('window:setBackgroundColor', (_event, color: string) => {
   if (mainWindow) {
     mainWindow.setBackgroundColor(color)
   }
+})
+
+// Renderer confirmed leave — actually close the window
+ipcMain.handle('window:confirm-close', () => {
+  allowClose = true
+  awaitingLeaveDecision = false
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.close()
+  }
+  return true
+})
+
+// Renderer cancelled leave dialog — allow another X click
+ipcMain.handle('window:cancel-close', () => {
+  awaitingLeaveDecision = false
+  return true
 })
 
 // Open book dialog
