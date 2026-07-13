@@ -17,7 +17,11 @@ export default function TopBar({ onOpenSettings }: Props) {
   const { isExpanded, setExpanded, setShowMiniPlayer, isPlaying } = useMusicStore()
 
   return (
-    <header className="h-12 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 no-select bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm">
+    <header className={`h-12 flex items-center justify-between px-4 no-select chrome-border-b ${
+      currentView === 'reader'
+        ? 'chrome-surface text-[var(--reader-text)]'
+        : 'bg-white dark:bg-gray-950 border-b border-gray-300 dark:border-gray-700'
+    }`}>
       <div className="flex items-center gap-3">
         {currentView === 'reader' && (
           <button

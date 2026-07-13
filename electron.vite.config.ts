@@ -18,6 +18,20 @@ export default defineConfig({
       }
     },
     plugins: [react()],
+    build: {
+      target: 'esnext',
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
+              return 'vendor-react'
+            }
+            if (id.includes('node_modules/lucide-react')) return 'vendor-icons'
+            if (id.includes('node_modules/zustand')) return 'vendor-zustand'
+          }
+        }
+      }
+    },
     css: {
       postcss: {
         plugins: [tailwindcss, autoprefixer]

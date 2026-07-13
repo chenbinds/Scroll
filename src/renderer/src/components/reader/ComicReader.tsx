@@ -127,36 +127,33 @@ export default function ComicReader({ filePath, format, onClose, onPageChange, i
   }, [prevPage, nextPage, goToPage, pages.length])
 
   return (
-    <div className="h-full flex flex-col bg-gray-100 dark:bg-gray-950">
-      {/* Top toolbar */}
-      <div className="h-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800
-                      flex items-center justify-between px-3 no-select flex-shrink-0">
+    <div className="reader-frame">
+      <div className="reader-toolbar">
         <button onClick={onClose}
-          className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+          className="text-sm chrome-muted hover:opacity-80 transition-colors">
           ← {t('app.backToLibrary')}
         </button>
 
         <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-400 tabular-nums">{currentPage} / {pages.length}</span>
+          <span className="text-xs chrome-muted tabular-nums">{currentPage} / {pages.length}</span>
         </div>
 
         <div className="flex items-center gap-3">
           <button onClick={zoomOut}
-            className="p-1 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+            className="p-1 chrome-muted hover:opacity-80 transition-colors">
             <ZoomOut size={16} />
           </button>
-          <span className="text-xs text-gray-400 tabular-nums w-10 text-center">
+          <span className="text-xs chrome-muted tabular-nums w-10 text-center">
             {Math.round(scale * 100)}%
           </span>
           <button onClick={zoomIn}
-            className="p-1 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+            className="p-1 chrome-muted hover:opacity-80 transition-colors">
             <ZoomIn size={16} />
           </button>
         </div>
       </div>
 
-      {/* Scrollable content */}
-      <div ref={containerRef} className="flex-1 overflow-auto scrollbar-thin">
+      <div ref={containerRef} className="reader-scroll scrollbar-thin">
         {loading && (
           <div className="flex items-center justify-center h-full">
             <div className="flex gap-1.5">
@@ -205,27 +202,27 @@ export default function ComicReader({ filePath, format, onClose, onPageChange, i
 
       {/* Bottom navigation bar */}
       {!loading && !error && pages.length > 0 && (
-        <div className="h-10 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800
+        <div className="h-10 chrome-surface chrome-border-t
                         flex items-center justify-center gap-4 no-select flex-shrink-0">
           <button onClick={() => goToPage(1)} disabled={currentPage === 1}
-            className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 disabled:opacity-30 transition-colors">
+            className="p-1 chrome-muted hover:opacity-80 disabled:opacity-30 transition-colors">
             <SkipBack size={16} />
           </button>
           <button onClick={prevPage} disabled={currentPage === 1}
-            className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 disabled:opacity-30 transition-colors">
+            className="p-1 chrome-muted hover:opacity-80 disabled:opacity-30 transition-colors">
             <ChevronLeft size={18} />
           </button>
 
-          <span className="text-xs text-gray-500 tabular-nums w-24 text-center select-text">
+          <span className="text-xs chrome-muted tabular-nums w-24 text-center select-text">
             {currentPage} / {pages.length}
           </span>
 
           <button onClick={nextPage} disabled={currentPage === pages.length}
-            className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 disabled:opacity-30 transition-colors">
+            className="p-1 chrome-muted hover:opacity-80 disabled:opacity-30 transition-colors">
             <ChevronRight size={18} />
           </button>
           <button onClick={() => goToPage(pages.length)} disabled={currentPage === pages.length}
-            className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 disabled:opacity-30 transition-colors">
+            className="p-1 chrome-muted hover:opacity-80 disabled:opacity-30 transition-colors">
             <SkipForward size={16} />
           </button>
         </div>

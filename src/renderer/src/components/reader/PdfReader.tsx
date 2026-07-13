@@ -229,25 +229,23 @@ export default function PdfReader({ filePath, onClose, onPageChange, initialPage
   const zoomOut = useCallback(() => setScale((s) => Math.round(Math.max(s - 0.25, 0.5) * 100) / 100), [])
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-gray-950">
-      {/* Top toolbar */}
-      <div className="h-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800
-                      flex items-center justify-between px-3 no-select flex-shrink-0">
+    <div className="reader-frame">
+      <div className="reader-toolbar">
         <button onClick={onClose}
-          className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+          className="text-sm chrome-muted hover:opacity-80 transition-colors">
           ← {t('app.backToLibrary')}
         </button>
 
         <div className="flex items-center gap-3">
           <button onClick={zoomOut}
-            className="p-1 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+            className="p-1 chrome-muted hover:opacity-80 transition-colors">
             <ZoomOut size={16} />
           </button>
-          <span className="text-xs text-gray-400 tabular-nums w-10 text-center">
+          <span className="text-xs chrome-muted tabular-nums w-10 text-center">
             {Math.round(scale * 100)}%
           </span>
           <button onClick={zoomIn}
-            className="p-1 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+            className="p-1 chrome-muted hover:opacity-80 transition-colors">
             <ZoomIn size={16} />
           </button>
         </div>
@@ -257,7 +255,7 @@ export default function PdfReader({ filePath, onClose, onPageChange, initialPage
 
       {/* Scrollable content */}
       <div ref={containerRef}
-        className="flex-1 overflow-auto scrollbar-thin">
+        className="reader-scroll scrollbar-thin">
         {loading && (
           <div className="flex items-center justify-center h-full">
             <div className="flex gap-1.5">

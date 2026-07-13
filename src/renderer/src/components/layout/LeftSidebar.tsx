@@ -62,16 +62,16 @@ export default function LeftSidebar() {
   return (
     <aside
       style={{ width }}
-      className="relative border-r border-gray-200 dark:border-gray-800 flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden flex-shrink-0"
+      className="relative chrome-border-r flex flex-col chrome-surface overflow-hidden flex-shrink-0"
     >
       {/* Tab bar */}
-      <div className="flex border-b border-gray-200 dark:border-gray-800">
+      <div className="flex chrome-border-b">
         <button
           onClick={() => setLeftSidebarTab('toc')}
           className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors ${
             leftSidebarTab === 'toc'
-              ? 'text-scroll-600 dark:text-scroll-400 border-b-2 border-scroll-500 bg-white dark:bg-gray-950'
-              : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+              ? 'text-scroll-600 dark:text-scroll-400 border-b-2 border-scroll-500 chrome-surface-raised'
+              : 'chrome-muted hover:opacity-80'
           }`}
         >
           <FileText size={14} />
@@ -81,8 +81,8 @@ export default function LeftSidebar() {
           onClick={() => setLeftSidebarTab('bookmarks')}
           className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors ${
             leftSidebarTab === 'bookmarks'
-              ? 'text-scroll-600 dark:text-scroll-400 border-b-2 border-scroll-500 bg-white dark:bg-gray-950'
-              : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+              ? 'text-scroll-600 dark:text-scroll-400 border-b-2 border-scroll-500 chrome-surface-raised'
+              : 'chrome-muted hover:opacity-80'
           }`}
         >
           <Bookmark size={14} />

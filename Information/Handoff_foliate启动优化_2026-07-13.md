@@ -2,30 +2,25 @@
 
 ## 1. 当前状态
 
-卷轴 Scroll 本轮已把 MOBI/AZW3 从「半移植解析器 / Calibre」切到 **foliate-js**（与 Koodo 同源），并做了书名清洗、豆瓣评分策略调整、封面落盘与启动优化。**代码已构建进 `out/`，但尚未 git commit。** 用户侧仍反馈启动偶发慢（实测应用侧约 0.4s 就绪，怀疑 Windows 杀软扫描 electron.exe）。
+卷轴 Scroll 已完成 MOBI/AZW3 → **foliate-js** 迁移、启动优化、封面落盘、豆瓣评分策略调整，以及左右侧栏可拖动改宽。**已 git commit（`1e3ca67`）**。用户侧启动体感仍待复测（应用内 bootstrap ~0.4s，疑杀软/冷启动）。
 
 ## 2. Git 状态
 
 - 分支：`master`
-- 最新提交：`af5fcd7 docs: final update for handoff - CLAUDE.md + memory files`
-- 工作区：大量未提交修改（见下）+ 未跟踪新文件
+- 最新提交：`1e3ca67 feat: foliate-js MOBI, startup speedups, and resizable sidebars`
+- 工作区：仅未跟踪临时日志 `scripts/boot-err.txt`、`scripts/boot-out.txt`（可忽略或删除）
 - 项目根：`D:\00_AIT_Work_Cursor\Projects\03_Scroll\Scroll`
-
-### 主要变更文件
-
-- 修改：`src/main/index.ts`、`storage.ts`、`preload`、`App.tsx`、`AppShell`、`LibraryView`、`BookCard`、`MobiReader`、`EpubReader`、`mobiParser.ts`、`epubParser.ts`、`Scroll.vbs`、`electron-builder.yml`、`package.json`、`CLAUDE.md`、locales 等
-- 新增：`src/main/covers.ts`、`src/renderer/src/lib/bookTitle.ts`、`coverImage.ts`、`src/renderer/src/types/foliate-js.d.ts`、`scripts/migrate-covers.js` 等
 
 ## 3. 项目结构
 
 - 项目根：`D:\00_AIT_Work_Cursor\Projects\03_Scroll\Scroll`
 - 技术栈：Electron 31 + React 18 + TypeScript + electron-vite + Tailwind + Zustand
 - 关键目录：
-  - `src/main/` — 主进程（窗口、IPC、存储、封面协议）
+  - `src/main/` — 主进程（窗口、IPC、存储、封面协议 `covers.ts`）
   - `src/renderer/` — React UI / 解析器
   - `out/` — 构建产物（`Scroll.vbs` 直接跑这里）
-  - `docs/` — 产品/架构文档
-  - `CLAUDE.md` / `HANDOFF.md` — 项目指令与旧交接
+  - `Information/` — 最新 handoff
+  - `CLAUDE.md` / `HANDOFF.md` — 项目指令与旧交接（HANDOFF.md 已过时）
 
 ## 4. 运行方式
 
@@ -40,76 +35,108 @@
 
 用户数据（本机）：
 
-- 书架 JSON：`%APPDATA%\Electron\data\books_books.json`（已瘦到约 3.6KB）
+- 书架 JSON：`%APPDATA%\Electron\data\books_books.json`
 - 封面文件：`%APPDATA%\Electron\covers\{bookId}.jpg`
 - 封面 URL 格式：`scroll-cover://local/{bookId}`
 
 ## 5. 已实现能力（本轮）
 
-1. **MOBI/AZW3 → foliate-js**  
-   - `mobiParser.ts` 用 `foliate-js/mobi.js` + `fflate`  
-   - 去掉 Calibre 主路径与 `mobi:convert` IPC  
-   - `electron-builder.yml` 不再打包 `tools/`
-
-2. **书名清洗**（`bookTitle.ts`）  
-   - 去掉 z-library 后缀、长宣传语括号  
-   - 导入 + 打开书时同步到顶栏/目录/书架
-
-3. **豆瓣评分策略**  
-   - **仅导入时**自动拉一次  
-   - **启动不再请求**  
-   - 书架封面悬停可手动点星标刷新
-
-4. **封面落盘**（`src/main/covers.ts`）  
-   - 缩略图 JPEG 存 `userData/covers/`  
-   - 自定义协议 `scroll-cover://`  
-   - 启动时迁移残留 `data:` 封面（含错误 MIME `application/octet-stream`）
-
-5. **启动优化**  
-   - 窗口立即显示启动闪屏「正在启动…」  
-   - `app:bootstrap` 一次 IPC 拉齐 books/settings  
-   - 阅读器 / 设置 / 侧栏 / 音乐懒加载  
-   - 去掉 React StrictMode  
-   - `Scroll.vbs` 直接启动 electron，不套 cmd  
-   - 本机实测：`did-finish-load ~372ms`，`bootstrap ~390ms`
+1. **MOBI/AZW3 → foliate-js**（`mobiParser.ts` + `foliate-js/mobi.js`）
+2. **书名清洗**（`bookTitle.ts`）
+3. **豆瓣评分**：仅导入时拉一次 + 书架手动刷新；启动不请求
+4. **封面落盘**（`covers.ts` + `scroll-cover://` 协议）
+5. **启动优化**：闪屏、`app:bootstrap`、懒加载、去 StrictMode、`Scroll.vbs` 直启
+6. **左右侧栏可拖动改宽**（`LeftSidebar.tsx` / `RightSidebar.tsx`，宽度存 localStorage）
+7. **侧栏折叠行为**：侧栏内「目录/书签」标签只切换内容；**仅顶栏图标**折叠/展开左侧栏（`setLeftSidebarTab` vs `toggleLeftSidebar`）
 
 ## 6. 进展与缺口
 
 | 项 | 状态 |
 |----|------|
-| MOBI 用 foliate 可读 | ✅ 用户已确认「可以了」 |
-| 书名不显示文件名脏串 | ✅ |
-| 评分不在启动刷 | ✅ |
-| 启动体感仍慢（用户报白屏~8s） | ⚠️ 应用侧已快；疑杀软/冷启动，待用户反馈最新构建 |
-| 封面加载~3s | ⚠️ 封面已落盘且很小；待复测 |
-| DJVU / CBR / 全局字号 | ❌ 未做 |
-| git commit | ❌ 用户未要求提交 |
+| MOBI foliate 可读 | ✅ |
+| 书名清洗 / 评分策略 / 封面落盘 | ✅ |
+| 左右侧栏拖动 | ✅ |
+| 侧栏不误收起 | ✅ |
+| git commit | ✅ `1e3ca67` |
+| 启动体感仍慢 | ⚠️ 待用户复测（区分窗晚出 vs 卡启动页） |
+| 封面加载慢 | ⚠️ 待复测 |
+| DJVU / CBR / 全局字号 | ❌ 低优先级 |
+| 更新旧 `HANDOFF.md` | ❌ 可选 |
 
 ## 7. 重要决策与约束
 
-1. **不要自研 MOBI 二进制解析**；用 foliate-js，不要再捆绑 Calibre（~200MB）进安装包。
-2. **EPUB 全量渲染**，不做虚拟章节；NCX 用 DOMParser。
+1. **MOBI 用 foliate-js**，不要自研、不要捆绑 Calibre。
+2. **EPUB 全量渲染**；NCX 用 DOMParser。
 3. **豆瓣：导入拉一次 + 手动刷新**；禁止启动批量请求。
 4. **封面不进 JSON**；只存 `scroll-cover://` 引用。
-5. 日常用 **`Scroll.vbs` + `rebuild.bat`**；改代码后需重建 `out/`。
-6. 测试书目录（只读）：`D:\10_Books\05_人文艺术与生活类`（若本机有）。
+5. 日常 **`Scroll.vbs` + `rebuild.bat`**；改代码后需重建 `out/`。
+6. PowerShell 用 `;` 不用 `&&`。
+7. 测试书目录（只读）：`D:\10_Books\05_人文艺术与生活类`
 
 ## 8. 已知坑
 
-1. `setup_calibre.bat` 把 Portable **installer.exe** 当 zip 解压 —— 方案已废弃，勿再依赖。
-2. 旧「Koodo 移植」解析器 HUFF/CDIC 乱码；根因是半移植，不是格式无解。
-3. 部分封面曾是 `data:application/octet-stream;base64,`（实为 JPEG），迁移正则必须接受非 `image/*` MIME。
-4. 用户感知「白屏 8 秒」与应用内 bootstrap 时间不符；优先查 Defender 扫描 `node_modules\electron`、是否误用 `start.bat`。
-5. PowerShell 不支持 `&&`，用 `;`。
+1. `setup_calibre.bat` / Calibre 方案已废弃。
+2. 旧 HANDOFF.md 仍写半移植 MOBI —— 以本文件为准。
+3. 封面迁移需接受 `data:application/octet-stream;base64,` MIME。
+4. 启动慢可能是 Defender 扫 `node_modules\electron`，勿误用 `start.bat` 当日常启动。
+5. 侧栏宽度 key：`scroll-left-sidebar-width` / `scroll-right-sidebar-width`（localStorage）。
 
 ## 9. 建议下一步
 
-1. 请用户用最新 `Scroll.vbs` 复测启动：区分「很久才弹出窗口」vs「立刻弹出但卡在启动页」。
-2. 若仍是前者：加 Windows 安全中心排除项，或做真正的 portable `Scroll.exe` 打包路径优化。
-3. 用户确认启动可接受后：**按用户要求再 git commit**（当前未提交）。
-4. 可选：更新 `HANDOFF.md` / `CLAUDE.md` 与本文件对齐（封面协议、bootstrap）。
-5. 低优先级：DJVU、CBR、全局字体缩放。
+1. 用户复测启动与封面加载，反馈「窗晚出」还是「卡启动页」。
+2. 若启动仍慢：Defender 排除项或 portable `Scroll.exe` 打包优化。
+3. 低优先级：DJVU、CBR、全局字体缩放；对齐旧 `HANDOFF.md`。
 
-## 10. 下个窗口启动提示词
+## 11. 2026-07-13 下午增量
 
-见下方「可复制提示词」；也可直接复制本文件第 10 节意涵给新会话。
+| 项 | 状态 | 说明 |
+|----|------|------|
+| 启动优化（preload bootstrap / 拆包 / lazy 封面） | ✅ 已做 | 用户反馈「好一些了」 |
+| 书架卡片缩小 30% | ✅ | `auto-fill minmax(8.5rem)` + 卡片内文字缩小 |
+| 豆瓣评分排查 | ✅ 已定位 | 公司网络 `ECONNRESET`，book/frodo/api 全失败；UI 现显示「无法连接豆瓣/被网络拦截」 |
+| 阅读主题覆盖整窗 | ✅ | `reader-chrome` CSS 变量：顶栏/侧栏/工具栏/正文统一色系，分隔线 `--reader-border` 加深 |
+
+**豆瓣结论：** 非代码解析问题，是公司防火墙阻断 `*.douban.com`。换网络/VPN 或手动输入评分（未做）才可解决。
+
+**待办 backlog：** DJVU / CBR / 全局字号 / 同步旧 HANDOFF.md
+
+
+```text
+请接手本项目上下文，不要从零开始。
+
+目标项目：
+D:\00_AIT_Work_Cursor\Projects\03_Scroll\Scroll
+
+请先阅读以下文件（按顺序）：
+1. Information/Handoff_foliate启动优化_2026-07-13.md
+2. CLAUDE.md
+3. HANDOFF.md（旧交接，作补充；以 Information 下最新 handoff 为准）
+
+项目概况：
+- 技术栈：Electron 31 + React 18 + TypeScript + electron-vite + Tailwind + Zustand
+- 日常启动：双击 Scroll.vbs（跑 out/）
+- 构建：rebuild.bat 或 npx electron-vite build
+- 开发：start.bat（较慢，非日常）
+
+最新提交：
+1e3ca67 feat: foliate-js MOBI, startup speedups, and resizable sidebars
+
+当前分支：master
+
+重要决策与约束：
+- MOBI/AZW3 用 foliate-js，不要自研解析，不要再捆绑 Calibre
+- EPUB 全量渲染；NCX 用 DOMParser
+- 豆瓣评分：仅导入时拉一次 + 书架手动刷新；禁止启动批量请求
+- 封面存 userData/covers，JSON 只留 scroll-cover:// 引用
+- 左右侧栏可拖动；侧栏内点目录/书签不收起，仅顶栏图标折叠
+- PowerShell 用 ; 不用 &&
+
+开始前请运行验证：
+cd D:\00_AIT_Work_Cursor\Projects\03_Scroll\Scroll; git status --short; npx electron-vite build
+
+当前进度：
+- 已完成：foliate-js MOBI、启动优化、封面落盘、侧栏拖动、侧栏折叠修复、已 commit 1e3ca67
+- 待完成：用户复测启动/封面；低优先级 DJVU/CBR/全局字号
+
+不要急着写代码，先通读上述文件确认当前实现状态和剩余缺口，再给出下一阶段计划。
+```

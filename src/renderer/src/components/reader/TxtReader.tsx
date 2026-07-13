@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import { parseTxt, type TxtChapter } from '../../lib/txtParser'
 import { useAppStore } from '../../stores/appStore'
+import { useReaderFontSize } from '../../lib/useReaderFontSize'
 import ReaderThemeBar from './ReaderThemeBar'
 import { useI18n } from '../../lib/i18n'
 
@@ -18,7 +19,7 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
   const [title, setTitle] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [fontSize, setFontSize] = useState(100)
+  const { fontSize, increaseFont, decreaseFont } = useReaderFontSize()
   const contentRef = useRef<HTMLDivElement | null>(null)
   const hasRestoredRef = useRef(false)
 
@@ -112,9 +113,6 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
     return () => el.removeEventListener('scroll', onScroll)
   }, [loading, chapters, onProgress])
 
-  const increaseFont = useCallback(() => setFontSize((s) => Math.min(s + 10, 200)), [])
-  const decreaseFont = useCallback(() => setFontSize((s) => Math.max(s - 10, 60)), [])
-
   // Bookmark navigation
   const navigateToPercent = useAppStore((s) => s.navigateToPercent)
   const setNavigateToPercent = useAppStore((s) => s.setNavigateToPercent)
@@ -138,27 +136,26 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
   }, [])
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-gray-950">
-      <div className="h-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800
-                      flex items-center justify-between px-3 no-select flex-shrink-0">
-        <button onClick={onClose} className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+    <div className="reader-frame">
+      <div className="reader-toolbar">
+        <button onClick={onClose} className="text-sm chrome-muted hover:opacity-80 transition-colors">
           ← {t('app.backToLibrary')}
         </button>
-        <span className="text-xs text-gray-400 truncate max-w-[300px]">{title}</span>
+        <span className="text-xs chrome-muted truncate max-w-[300px]">{title}</span>
           <ReaderThemeBar />
           
         <div className="flex items-center gap-3">
-          <button onClick={decreaseFont} className="p-1 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+          <button onClick={decreaseFont} className="p-1 chrome-muted hover:opacity-80 transition-colors">
             <ZoomOut size={16} />
           </button>
-          <span className="text-xs text-gray-400 tabular-nums w-10 text-center">{fontSize}%</span>
-          <button onClick={increaseFont} className="p-1 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+          <span className="text-xs chrome-muted tabular-nums w-10 text-center">{fontSize}%</span>
+          <button onClick={increaseFont} className="p-1 chrome-muted hover:opacity-80 transition-colors">
             <ZoomIn size={16} />
           </button>
         </div>
       </div>
 
-      <div ref={setContentRef} className="flex-1 overflow-auto scrollbar-thin">
+      <div ref={setContentRef} className="reader-scroll scrollbar-thin">
         {loading && (
           <div className="flex items-center justify-center h-full">
             <div className="flex gap-1.5">
@@ -175,11 +172,11 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
         )}
         {!loading && !error && (
           <div className="max-w-4xl mx-auto px-8 py-6 reader-content" style={{ fontSize: `${fontSize}%` }}>
-            <h1 className="text-2xl font-bold mb-8 text-center text-gray-900 dark:text-gray-100">{title}</h1>
+            <h1 className="text-2xl font-bold mb-8 text-center">{title}</h1>
             {chapters.map((ch, i) => (
               <section key={i} data-id={`chapter-${i}`} className="mb-8">
                 {chapters.length > 1 && (
-                  <h2 className="font-bold text-lg mb-4 text-gray-900 dark:text-gray-100">{ch.title}</h2>
+                  <h2 className="font-bold text-lg mb-4">{ch.title}</h2>
                 )}
                 {ch.content.split('\n').map((para, j) =>
                   para.trim() ? <p key={j}>{para}</p> : <br key={j} />

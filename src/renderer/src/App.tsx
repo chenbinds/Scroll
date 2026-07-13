@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import AppShell from './components/layout/AppShell'
-import LibraryView from './components/library/LibraryView'
 import { useAppStore } from './stores/appStore'
-import { getThemeStyle } from './lib/readingTheme'
+import { getThemeCssVars } from './lib/readingTheme'
 import { cleanBookTitle } from './lib/bookTitle'
+import { isBootstrapHydrated } from './bootstrapHydrate'
+
+const LibraryView = lazy(() => import('./components/library/LibraryView'))
 
 const PdfReader = lazy(() => import('./components/reader/PdfReader'))
 const EpubReader = lazy(() => import('./components/reader/EpubReader'))
@@ -27,10 +29,22 @@ function ReaderFallback() {
   )
 }
 
+function LibraryFallback() {
+  return (
+    <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-600">
+      <div className="flex gap-1.5 mb-4">
+        <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+        <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+        <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   const { currentView, currentBook, darkMode, setCurrentView, updateBookProgress } = useAppStore()
   const [showSettings, setShowSettings] = useState(false)
-  const [libraryReady, setLibraryReady] = useState(false)
+  const [libraryReady, setLibraryReady] = useState(isBootstrapHydrated())
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode)
@@ -40,19 +54,19 @@ export default function App() {
   const readingTheme = useAppStore((s) => s.readingTheme)
   const readingFont = useAppStore((s) => s.readingFont)
   useEffect(() => {
-    const style = getThemeStyle(readingTheme, readingFont)
+    const vars = getThemeCssVars(readingTheme, readingFont)
     const root = document.documentElement
-    root.style.setProperty('--reader-bg', style.backgroundColor)
-    root.style.setProperty('--reader-text', style.color)
-    if (style.fontFamily) root.style.setProperty('--reader-font', style.fontFamily)
-    else root.style.removeProperty('--reader-font')
+    for (const [key, value] of Object.entries(vars)) {
+      root.style.setProperty(key, value)
+    }
   }, [readingTheme, readingFont])
 
-  // Single bootstrap IPC — all startup state at once
+  // Fallback bootstrap if hydrate ran before scrollAPI (HMR / edge cases)
   useEffect(() => {
+    if (libraryReady) return
     const t0 = performance.now()
     let cancelled = false
-    window.scrollAPI.bootstrap().then((data) => {
+    void window.scrollAPI.bootstrap().then((data) => {
       if (cancelled) return
       const st = useAppStore.getState()
       if (Array.isArray(data.books) && data.books.length > 0) {
@@ -67,6 +81,7 @@ export default function App() {
       if (typeof data.darkMode === 'boolean') st.setDarkMode(data.darkMode)
       if (typeof data.readingTheme === 'string') st.setReadingTheme(data.readingTheme as any)
       if (typeof data.readingFont === 'string') st.setReadingFont(data.readingFont as any)
+      if (typeof data.readerFontSize === 'number') st.setReaderFontSize(data.readerFontSize)
       if (data.aiConfig) st.setAiConfig(data.aiConfig as any)
       setLibraryReady(true)
       console.log(`[scroll] renderer bootstrap done in ${(performance.now() - t0).toFixed(0)}ms`)
@@ -75,7 +90,13 @@ export default function App() {
       setLibraryReady(true)
     })
     return () => { cancelled = true }
-  }, [])
+  }, [libraryReady])
+
+  const readerFontSize = useAppStore((s) => s.readerFontSize)
+  useEffect(() => {
+    if (!libraryReady) return
+    window.scrollAPI.storage.set('readerFontSize', readerFontSize).catch(() => {})
+  }, [readerFontSize, libraryReady])
 
   const { books } = useAppStore()
   useEffect(() => {
@@ -211,7 +232,11 @@ export default function App() {
 
   return (
     <AppShell onOpenSettings={() => setShowSettings(true)}>
-      {currentView === 'library' ? <LibraryView /> : (
+      {currentView === 'library' ? (
+        <Suspense fallback={<LibraryFallback />}>
+          <LibraryView libraryReady={libraryReady} />
+        </Suspense>
+      ) : (
         <Suspense fallback={<ReaderFallback />}>{renderReader()}</Suspense>
       )}
       {showSettings && (

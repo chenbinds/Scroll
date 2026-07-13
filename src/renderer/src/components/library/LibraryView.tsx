@@ -12,20 +12,29 @@ function patchBook(id: string, patch: Partial<Book>) {
   )
 }
 
-async function fetchDoubanRating(book: Pick<Book, 'id' | 'title' | 'author'>, unknownAuthorLabel: string) {
+type RatingError = 'network' | 'timeout' | 'blocked' | 'not_found' | 'http'
+
+async function fetchDoubanRating(
+  book: Pick<Book, 'id' | 'title' | 'author'>,
+  unknownAuthorLabel: string
+): Promise<{ rating: number } | { error: RatingError }> {
   const q =
     book.title.length > 3
       ? book.title
       : book.title + ' ' + (book.author !== unknownAuthorLabel && book.author !== 'Unknown Author' ? book.author : '')
   const info = await window.scrollAPI.doubanSearch(q)
-  if (info?.rating != null) {
+  if (info?.ok) {
     patchBook(book.id, { doubanRating: info.rating })
-    return info.rating as number
+    return { rating: info.rating }
   }
-  return null
+  return { error: info?.error ?? 'network' }
 }
 
-export default function LibraryView() {
+interface Props {
+  libraryReady: boolean
+}
+
+export default function LibraryView({ libraryReady }: Props) {
   const { t } = useI18n()
   const { books, addBook, openBook, removeBook } = useAppStore()
 
@@ -84,14 +93,23 @@ export default function LibraryView() {
   }, [addBook, t])
 
   const handleRefreshRating = useCallback(async (book: Book) => {
-    try {
-      await fetchDoubanRating(book, t('library.unknownAuthor'))
-    } catch { /* ignore */ }
+    return fetchDoubanRating(book, t('library.unknownAuthor'))
   }, [t])
 
   return (
     <div className="h-full overflow-y-auto scrollbar-thin">
-      {books.length === 0 && (
+      {!libraryReady && (
+        <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-600">
+          <div className="flex gap-1.5 mb-4">
+            <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{t('library.loading')}</p>
+        </div>
+      )}
+
+      {libraryReady && books.length === 0 && (
         <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-600">
           <BookIcon size={64} strokeWidth={1} />
           <h2 className="mt-4 text-lg font-medium text-gray-500 dark:text-gray-400">
@@ -109,7 +127,7 @@ export default function LibraryView() {
         </div>
       )}
 
-      {books.length > 0 && (
+      {libraryReady && books.length > 0 && (
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -127,7 +145,7 @@ export default function LibraryView() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-3 [content-visibility:auto]">
             {books.map((book) => (
               <BookCard
                 key={book.id}

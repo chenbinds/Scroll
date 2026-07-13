@@ -62,7 +62,7 @@ export default function RightSidebar() {
   return (
     <aside
       style={{ width }}
-      className="relative border-l border-gray-200 dark:border-gray-800 flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden flex-shrink-0"
+      className="relative chrome-border-l flex flex-col chrome-surface overflow-hidden flex-shrink-0"
     >
       {/* Drag handle — left edge */}
       <div
@@ -73,14 +73,14 @@ export default function RightSidebar() {
         className="absolute top-0 left-0 z-10 h-full w-1.5 cursor-col-resize hover:bg-scroll-500/40 active:bg-scroll-500/60 transition-colors"
       />
 
-      <div className="h-10 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-3">
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+      <div className="h-10 chrome-border-b flex items-center justify-between px-3">
+        <span className="text-sm font-medium flex items-center gap-1.5">
           <MessageCircle size={14} className="text-scroll-500" />
           {t('app.ai')}
         </span>
         <button
           onClick={toggleRightSidebar}
-          className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400"
+          className="p-1 rounded chrome-muted hover:opacity-80"
         >
           <X size={16} />
         </button>

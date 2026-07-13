@@ -9,6 +9,7 @@ import {
   migrateInlineCovers,
   coverUrlFor
 } from './covers'
+import { searchDoubanBook } from './douban'
 import { bookStore, settingsStore, musicStore } from './storage'
 
 const bootStarted = Date.now()
@@ -34,7 +35,8 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
       webSecurity: true,
-      backgroundThrottling: false
+      backgroundThrottling: false,
+      v8CacheOptions: 'bypassHeatCheck'
     }
   })
 
@@ -157,67 +159,36 @@ ipcMain.handle('covers:save', async (_event, bookId: string, dataUrl: string) =>
 
 ipcMain.handle('covers:url', (_event, bookId: string) => coverUrlFor(bookId))
 
-// Douban search proxy — uses Node.js https (reliable, bypasses Electron net.fetch issues)
+// Douban search proxy — Node.js https; returns structured errors for UI feedback
 ipcMain.handle('douban:search', async (_event, title: string, author?: string) => {
-  try {
-    const query = encodeURIComponent(author ? `${title} ${author}` : title)
-    const html = await new Promise<string>((resolve, reject) => {
-      const httpMod = require('https') as typeof import('https')
-      const req = httpMod.get(
-        `https://book.douban.com/subject_search?search_text=${query}`,
-        {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml',
-            'Accept-Language': 'zh-CN,zh;q=0.9',
-          },
-        },
-        (res) => {
-          if (res.statusCode !== 200) { let d = ''; res.on('data', (c: string) => d += c); res.on('end', () => reject(new Error(`HTTP ${res.statusCode}: ${d.slice(0, 200)}`))); return }
-          let data = ''
-          res.on('data', (chunk: string) => data += chunk)
-          res.on('end', () => resolve(data))
-        }
-      )
-      req.on('error', reject)
-      req.setTimeout(15000, () => { req.destroy(); reject(new Error('timeout')) })
-    })
-    // Find rating blocks and extract nearby title + url
-    const ratingRe = /"rating":\s*\{"count":\s*\d+,\s*"rating_info":\s*"[^"]*",\s*"star_count":\s*[\d.]+,\s*"value":\s*([\d.]+)\}/g
-    let rm: RegExpExecArray | null
-    while ((rm = ratingRe.exec(html)) !== null) {
-      const value = parseFloat(rm[1])
-      if (isNaN(value) || value <= 0) continue
-      // Look for title and url near this rating (within 300 chars)
-      const ctx = html.slice(Math.max(0, rm.index - 300), rm.index + 500)
-      const tMatch = ctx.match(/"title":\s*"([^"]+)"/)
-      const uMatch = ctx.match(/"url":\s*"(https:\/\/book\.douban\.com\/subject\/\d+\/)"/)
-      if (tMatch && uMatch) {
-        const bookTitle = tMatch[1].replace(/\\u([0-9a-fA-F]{4})/g, (_s: string, h: string) => String.fromCharCode(parseInt(h, 16)))
-        return { rating: value, url: uMatch[1], title: bookTitle }
-      }
-    }
-    return null
-  } catch { return null }
+  return searchDoubanBook(title, author)
 })
 
 // One-shot bootstrap — avoids N sequential storage IPC round-trips on startup
 ipcMain.handle('app:bootstrap', async () => {
   const t0 = Date.now()
-  let books = bookStore.get('books', []) as unknown
-  if (Array.isArray(books)) {
-    const migrated = migrateInlineCovers(books as { id: string; coverUrl?: string }[])
-    if (migrated.changed) {
-      bookStore.set('books', migrated.books)
-      books = migrated.books
-    }
+  const books = bookStore.get('books', []) as unknown
+  const booksArr = Array.isArray(books) ? books : []
+
+  // Defer inline-cover migration — don't block first paint
+  const hasInlineCovers = booksArr.some(
+    (b) => typeof b === 'object' && b && 'coverUrl' in b && typeof (b as { coverUrl?: string }).coverUrl === 'string'
+      && (b as { coverUrl: string }).coverUrl.startsWith('data:')
+  )
+  if (hasInlineCovers) {
+    setImmediate(() => {
+      const migrated = migrateInlineCovers(booksArr as { id: string; coverUrl?: string }[])
+      if (migrated.changed) bookStore.set('books', migrated.books)
+    })
   }
+
   const payload = {
-    books: Array.isArray(books) ? books : [],
+    books: booksArr,
     bookmarks: settingsStore.get('bookmarks', []),
     darkMode: settingsStore.get('darkMode', true),
     readingTheme: settingsStore.get('readingTheme', 'light'),
     readingFont: settingsStore.get('readingFont', 'system'),
+    readerFontSize: settingsStore.get('readerFontSize', 100),
     aiConfig: settingsStore.get('aiConfig', null)
   }
   console.log(`[scroll] bootstrap +${Date.now() - bootStarted}ms (handler ${Date.now() - t0}ms)`)

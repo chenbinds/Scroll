@@ -15,10 +15,15 @@ const zh = {
   'library.empty.subtitle': '导入电子书，开始阅读之旅',
   'library.empty.importBtn': '导入书籍',
   'library.title': '书架',
+  'library.loading': '正在加载书架…',
   'library.import': '导入',
   'library.unknownAuthor': '未知作者',
   'library.remove': '从书架移除',
   'library.refreshRating': '手动更新豆瓣评分',
+  'library.ratingNetworkError': '无法连接豆瓣',
+  'library.ratingBlocked': '豆瓣被网络拦截',
+  'library.ratingNotFound': '未找到评分',
+  'library.ratingFailed': '获取失败',
   'library.fetchRating': '评分',
 
   // Reader

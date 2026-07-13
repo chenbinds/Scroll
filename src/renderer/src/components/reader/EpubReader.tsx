@@ -3,6 +3,7 @@ import { ZoomIn, ZoomOut } from 'lucide-react'
 import { parseEpub, type EpubContent, type TocItem } from '../../lib/epubParser'
 import { cleanBookTitle } from '../../lib/bookTitle'
 import { useAppStore } from '../../stores/appStore'
+import { useReaderFontSize } from '../../lib/useReaderFontSize'
 import ReaderThemeBar from './ReaderThemeBar'
 import { useI18n } from '../../lib/i18n'
 
@@ -23,7 +24,7 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
   const [author, setAuthor] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [fontSize, setFontSize] = useState(100)
+  const { fontSize, increaseFont, decreaseFont } = useReaderFontSize()
   const [epubContent, setEpubContent] = useState<EpubContent | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const hasRestoredRef = useRef(false)
@@ -170,9 +171,6 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
     return () => el.removeEventListener('scroll', onScroll)
   }, [epubContent, onProgress])
 
-  const increaseFont = useCallback(() => setFontSize((s) => Math.min(s + 10, 200)), [])
-  const decreaseFont = useCallback(() => setFontSize((s) => Math.max(s - 10, 60)), [])
-
   // Bookmark navigation
   const navigateToPercent = useAppStore((s) => s.navigateToPercent)
   const setNavigateToPercent = useAppStore((s) => s.setNavigateToPercent)
@@ -213,32 +211,31 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
   }, [epubContent])
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-gray-950">
+    <div className="reader-frame">
       {/* Toolbar */}
-      <div className="h-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800
-                      flex items-center justify-between px-3 no-select flex-shrink-0">
+      <div className="reader-toolbar">
         <button onClick={onClose}
-          className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+          className="text-sm chrome-muted hover:opacity-80 transition-colors">
           ← {t('app.backToLibrary')}
         </button>
-        <span className="text-xs text-gray-400 truncate max-w-[300px]">{title}</span>
+        <span className="text-xs chrome-muted truncate max-w-[300px]">{title}</span>
           <ReaderThemeBar />
           
         <div className="flex items-center gap-3">
           <button onClick={decreaseFont}
-            className="p-1 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+            className="p-1 chrome-muted hover:opacity-80 transition-colors">
             <ZoomOut size={16} />
           </button>
-          <span className="text-xs text-gray-400 tabular-nums w-10 text-center">{fontSize}%</span>
+          <span className="text-xs chrome-muted tabular-nums w-10 text-center">{fontSize}%</span>
           <button onClick={increaseFont}
-            className="p-1 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
+            className="p-1 chrome-muted hover:opacity-80 transition-colors">
             <ZoomIn size={16} />
           </button>
         </div>
       </div>
 
       {/* Content — full render, callback ref stores DOM el for TocPanel */}
-      <div ref={setContentRef} className="flex-1 overflow-auto scrollbar-thin">
+      <div ref={setContentRef} className="reader-scroll scrollbar-thin">
         {loading && (
           <div className="flex items-center justify-center h-full">
             <div className="flex gap-1.5">
@@ -260,9 +257,9 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
 
         {!loading && !error && chapterElements && (
           <div className="max-w-4xl mx-auto px-8 py-6 reader-content" style={{ fontSize: `${fontSize}%` }}>
-            <h1 className="text-2xl font-bold mb-2 text-center text-gray-900 dark:text-gray-100">{title}</h1>
+            <h1 className="text-2xl font-bold mb-2 text-center">{title}</h1>
             {author && author !== 'Unknown Author' && (
-              <p className="text-sm text-center text-gray-400 dark:text-gray-600 mb-8">{author}</p>
+              <p className="text-sm text-center chrome-muted mb-8">{author}</p>
             )}
             <div className={author && author !== 'Unknown Author' ? '' : 'mt-6'}>
               {chapterElements}

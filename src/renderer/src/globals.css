@@ -9,6 +9,10 @@
 :root {
   --reader-bg: #FFFFFF;
   --reader-text: #333333;
+  --reader-surface: #F3F4F6;
+  --reader-surface-raised: #E8EAED;
+  --reader-border: #B8BFC9;
+  --reader-muted: #6B7280;
   --reader-font: Cambria, 'Microsoft YaHei', Georgia, 'Times New Roman', serif;
   --ui-font: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
 }
@@ -44,10 +48,74 @@ body {
   font-family: var(--reader-font) !important;
 }
 
-.dark .reader-content { background-color: unset; color: #d4d4d4; }
+.dark .reader-content { background-color: var(--reader-bg); color: var(--reader-text); }
 .dark .reader-content h1,
 .dark .reader-content h2,
-.dark .reader-content h3 { color: #e5e5e5; }
+.dark .reader-content h3 { color: var(--reader-text); }
+
+/* ============================================================
+   Reader chrome — full-window reading theme
+   ============================================================ */
+
+.reader-chrome {
+  background-color: var(--reader-bg);
+  color: var(--reader-text);
+}
+
+.reader-chrome .chrome-surface {
+  background-color: var(--reader-surface);
+}
+
+.reader-chrome .chrome-surface-raised {
+  background-color: var(--reader-surface-raised);
+}
+
+.reader-chrome .chrome-border-b {
+  border-bottom: 1px solid var(--reader-border);
+}
+
+.reader-chrome .chrome-border-r {
+  border-right: 1px solid var(--reader-border);
+}
+
+.reader-chrome .chrome-border-l {
+  border-left: 1px solid var(--reader-border);
+}
+
+.reader-chrome .chrome-border-t {
+  border-top: 1px solid var(--reader-border);
+}
+
+.reader-chrome .chrome-muted {
+  color: var(--reader-muted);
+}
+
+.reader-chrome .reader-toolbar {
+  height: 2.5rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  user-select: none;
+  background-color: var(--reader-surface);
+  border-bottom: 1px solid var(--reader-border);
+}
+
+.reader-chrome .reader-frame {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--reader-bg);
+  color: var(--reader-text);
+}
+
+.reader-chrome .reader-scroll {
+  flex: 1;
+  overflow: auto;
+  background-color: var(--reader-bg);
+}
 
 .reader-content p { margin-bottom: 1.25rem; }
 .reader-content h1 { font-weight: 700; font-size: 1.5rem; margin: 2.5rem 0 1.25rem; }

@@ -27,7 +27,7 @@ export default function AppShell({ children, onOpenSettings }: Props) {
   }, [])
 
   return (
-    <div className="h-screen flex flex-col bg-slate-50 dark:bg-gray-950 transition-colors">
+    <div className={`h-screen flex flex-col transition-colors ${currentView === 'reader' ? 'reader-chrome' : 'bg-slate-50 dark:bg-gray-950'}`}>
       <TopBar onOpenSettings={onOpenSettings} />
 
       <div className="flex-1 flex overflow-hidden">

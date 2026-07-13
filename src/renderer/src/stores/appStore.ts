@@ -41,6 +41,10 @@ interface AppState {
   readingFont: 'system' | 'serif' | 'sans'
   setReadingFont: (font: AppState['readingFont']) => void
 
+  // Global reader font scale (EPUB/MOBI/TXT), persisted
+  readerFontSize: number
+  setReaderFontSize: (size: number) => void
+
   // Current book
   currentBook: Book | null
   openBook: (book: Book) => void
@@ -113,6 +117,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   readingFont: 'system',
   setReadingFont: (font) => set({ readingFont: font }),
+
+  readerFontSize: 100,
+  setReaderFontSize: (size) => set({ readerFontSize: Math.min(200, Math.max(60, Math.round(size))) }),
 
   currentBook: null,
   openBook: (book) => set({ currentBook: book, currentView: 'reader' }),

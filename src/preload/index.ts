@@ -1,5 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+/** Fire bootstrap as soon as preload runs — overlaps with renderer bundle parse */
+const bootstrapPromise = ipcRenderer.invoke('app:bootstrap')
+
 contextBridge.exposeInMainWorld('scrollAPI', {
   openBookDialog: () => ipcRenderer.invoke('dialog:openBook'),
   openMusicDialog: () => ipcRenderer.invoke('dialog:openMusic'),
@@ -8,7 +11,7 @@ contextBridge.exposeInMainWorld('scrollAPI', {
 
   getDataPath: () => ipcRenderer.invoke('app:getDataPath'),
   setBackgroundColor: (color: string) => ipcRenderer.invoke('window:setBackgroundColor', color),
-  bootstrap: () => ipcRenderer.invoke('app:bootstrap'),
+  bootstrap: () => bootstrapPromise,
 
   aiChat: (params: AiChatParams) => ipcRenderer.invoke('ai:chat', params),
 
@@ -34,8 +37,12 @@ export interface AiChatParams {
   maxTokens?: number
 }
 
+type DoubanSearchResult =
+  | { ok: true; rating: number; url: string; title: string }
+  | { ok: false; error: 'network' | 'timeout' | 'blocked' | 'not_found' | 'http' }
+
 export interface ScrollAPI {
-  doubanSearch: (title: string, author?: string) => Promise<any>
+  doubanSearch: (title: string, author?: string) => Promise<DoubanSearchResult>
   openBookDialog: () => Promise<string[] | null>
   openMusicDialog: () => Promise<string[] | null>
   readFile: (filePath: string) => Promise<string>
@@ -48,6 +55,7 @@ export interface ScrollAPI {
     darkMode: unknown
     readingTheme: unknown
     readingFont: unknown
+    readerFontSize: unknown
     aiConfig: unknown
   }>
   aiChat: (params: AiChatParams) => Promise<any>
