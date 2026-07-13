@@ -46,8 +46,7 @@
 | Peaceful Piano | classical |
 | Gentle Rain | nature |
 
-**注意:** 预置曲目不打包进安装包，而是直链 Pixabay CDN。
-若 CDN 链接失效，播放失败时自动跳过。
+**注意:** 现行实现为 **Web Audio API 实时生成** 内置氛围音（见 `musicStore.ts` / `audioGenerator.ts`），非 Pixabay CDN。规格中 Pixabay 预置为早期方案，以代码为准。
 
 ### 4. 用户自行添加
 

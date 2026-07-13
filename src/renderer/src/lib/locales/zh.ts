@@ -25,6 +25,21 @@ const zh = {
   'library.ratingNotFound': '未找到评分',
   'library.ratingFailed': '获取失败',
   'library.fetchRating': '评分',
+  'library.manualRating': '手动评分',
+  'library.manualRatingPrompt': '输入豆瓣评分（0–10，可留空清除）：',
+  'library.manualRatingInvalid': '请输入 0–10 之间的数字',
+  'library.refreshCover': '刷新封面',
+  'library.coverFailed': '封面提取失败',
+
+  // Bookmarks panel
+  'bookmarks.addPosition': '添加位置书签',
+  'bookmarks.positions': '位置书签',
+  'bookmarks.annotations': '标注',
+  'bookmarks.empty': '暂无书签或标注',
+  'bookmarks.page': '第',
+  'bookmarks.chapter': '章',
+  'bookmarks.brushStroke': '画笔标注',
+  'bookmarks.highlight': '高亮标记',
 
   // Reader
   'reader.placeholder.title': '阅读器引擎开发中',
@@ -75,7 +90,12 @@ const zh = {
   'ai.welcome.hint': '试试：总结本章内容 · 翻译选中段落 · 解释关键概念',
   'ai.placeholder': '向 AI 提问...',
   'ai.placeholder.disabled': '请先配置 AI 服务',
-  'ai.inputHint': 'Enter 发送 · Shift+Enter 换行',
+  'ai.inputHint': 'Enter 发送 · Shift+Enter 换行 · 拖动输入框上缘调整高度',
+  'ai.resizeInput': '拖动调整输入框高度',
+  'ai.askAi': '问 AI',
+  'ai.askAboutSelection': '关于以下内容：',
+  'ai.clearSession': '清空会话',
+  'ai.selectionReady': '已载入选区',
 
   // Music
   'music.playlist': '播放列表',
@@ -124,6 +144,11 @@ const zh = {
   'settings.saved': '已保存 ✓',
   'settings.cancel': '取消',
   'settings.clear': '清除配置',
+  'settings.ai.testConnection': '测试连通性',
+  'settings.ai.testing': '测试中…',
+  'settings.ai.testOk': '连接成功',
+  'settings.ai.testFailed': '连接失败',
+  'settings.ai.testMissing': '请先填写 API 地址、Key 和模型',
 
   // Common
   'common.ok': '确定',

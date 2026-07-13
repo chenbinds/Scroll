@@ -174,6 +174,88 @@ ipcMain.handle('ai:chat', async (_event, { baseUrl, apiKey, model, messages, max
   }
 })
 
+// AI 流式请求 — SSE chunks via webContents.send
+ipcMain.handle(
+  'ai:chatStream',
+  async (event, { baseUrl, apiKey, model, messages, maxTokens, requestId }) => {
+    const wc = event.sender
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        max_tokens: maxTokens || 4096,
+        temperature: 0.7,
+        stream: true
+      })
+    })
+
+    if (!response.ok) {
+      const errorBody = await response.text()
+      throw new Error(`AI API 错误 ${response.status}: ${errorBody}`)
+    }
+
+    if (!response.body) throw new Error('AI API 未返回流式响应')
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let fullText = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed.startsWith('data:')) continue
+        const data = trimmed.slice(5).trim()
+        if (data === '[DONE]') continue
+        try {
+          const json = JSON.parse(data) as {
+            choices?: { delta?: { content?: string } }[]
+          }
+          const delta = json.choices?.[0]?.delta?.content
+          if (delta) {
+            fullText += delta
+            wc.send('ai:stream-chunk', { requestId, chunk: delta })
+          }
+        } catch {
+          // ignore malformed SSE line
+        }
+      }
+    }
+
+    return { content: fullText }
+  }
+)
+
+ipcMain.handle('ai:test', async (_event, { baseUrl, apiKey, model }) => {
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: 'ping' }],
+      max_tokens: 8
+    })
+  })
+  if (!response.ok) {
+    const body = await response.text()
+    throw new Error(`HTTP ${response.status}: ${body.slice(0, 300)}`)
+  }
+  return { ok: true }
+})
+
 // Read file by local path (for cover extraction etc.)
 ipcMain.handle('file:readPath', async (_event, filePath: string) => {
   try {
@@ -215,7 +297,7 @@ ipcMain.handle('app:bootstrap', async () => {
 
   const payload = {
     books: booksArr,
-    bookmarks: settingsStore.get('bookmarks', []),
+    bookmarksByBook: settingsStore.get('bookmarksByBook', {}),
     darkMode: settingsStore.get('darkMode', true),
     readingTheme: settingsStore.get('readingTheme', 'light'),
     readingFont: settingsStore.get('readingFont', 'system'),

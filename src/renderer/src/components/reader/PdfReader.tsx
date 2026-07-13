@@ -103,6 +103,11 @@ export default function PdfReader({ filePath, onClose, onPageChange, initialPage
       })
 
       onPageChange?.(closestPage, pageCount)
+      useAppStore.getState().setAiContext({
+        page: closestPage,
+        pageTotal: pageCount,
+        content: `[PDF] Page ${closestPage}/${pageCount} — canvas rendering; text extraction limited.`
+      })
     }
 
     let progressTicking = false
@@ -124,6 +129,15 @@ export default function PdfReader({ filePath, onClose, onPageChange, initialPage
     container.addEventListener('scroll', onScroll, { passive: true })
     return () => container.removeEventListener('scroll', onScroll)
   }, [pageCount, onPageChange])
+
+  const navigateToPage = useAppStore((s) => s.navigateToPage)
+  const setNavigateToPage = useAppStore((s) => s.setNavigateToPage)
+  useEffect(() => {
+    if (navigateToPage === null || pageCount === 0 || !containerRef.current) return
+    const el = containerRef.current.querySelector(`[data-page="${navigateToPage}"]`)
+    if (el) el.scrollIntoView({ block: 'start' })
+    setNavigateToPage(null)
+  }, [navigateToPage, pageCount, setNavigateToPage])
 
   // Render a single page to its canvas
   const renderPageToCanvas = useCallback(async (pageNum: number) => {

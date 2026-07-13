@@ -15,6 +15,14 @@ export interface Book {
   currentPage: number
 }
 
+export interface Bookmark {
+  label: string
+  href?: string
+  page?: number
+  percent?: number
+  time: number
+}
+
 export interface AiConfig {
   name: string
   baseUrl: string
@@ -84,12 +92,15 @@ interface AppState {
   _readerEl: HTMLElement | null
   _setReaderEl: (el: HTMLElement | null) => void
 
-  // Bookmarks
-  bookmarks: { label: string; href?: string; page?: number; percent?: number; time: number }[]
-  addBookmark: (bm: AppState['bookmarks'][0]) => void
+  // Bookmarks (current book only; persisted in bookmarksByBook)
+  bookmarks: Bookmark[]
+  bookmarksByBook: Record<string, Bookmark[]>
+  addBookmark: (bm: Bookmark) => void
   removeBookmark: (index: number) => void
   clearBookmarks: () => void
-  setBookmarks: (bookmarks: AppState['bookmarks']) => void
+  setBookmarks: (bookmarks: Bookmark[]) => void
+  setBookmarksByBook: (map: Record<string, Bookmark[]>) => void
+  syncBookmarksForBook: (bookId: string) => void
 
   // Current reading position (for bookmark capture)
   readingPosition: { chapter?: string; page?: number; percent: number }
@@ -99,9 +110,32 @@ interface AppState {
   navigateToPercent: number | null
   setNavigateToPercent: (pct: number | null) => void
 
+  // Navigate to page (PDF / Comic)
+  navigateToPage: number | null
+  setNavigateToPage: (page: number | null) => void
+
   // AI context (current book + chapter content)
-  aiContext: { bookTitle: string; chapter?: string; content?: string }
+  aiContext: {
+    bookTitle: string
+    chapter?: string
+    content?: string
+    selection?: string
+    page?: number
+    pageTotal?: number
+  }
   setAiContext: (ctx: Partial<AppState['aiContext']>) => void
+
+  /** Prefill AI panel input (e.g. from text selection or annotation note) */
+  aiDraft: string | null
+  setAiDraft: (draft: string | null) => void
+  requestAiPanel: boolean
+  setRequestAiPanel: (open: boolean) => void
+}
+
+function sortBooksByRecent(books: Book[]): Book[] {
+  return [...books].sort(
+    (a, b) => (b.lastReadAt ?? b.addedAt ?? 0) - (a.lastReadAt ?? a.addedAt ?? 0)
+  )
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -122,20 +156,41 @@ export const useAppStore = create<AppState>((set, get) => ({
   setReaderFontSize: (size) => set({ readerFontSize: Math.min(200, Math.max(60, Math.round(size))) }),
 
   currentBook: null,
-  openBook: (book) => set({ currentBook: book, currentView: 'reader' }),
+  openBook: (book) => {
+    const s = get()
+    let bookmarksByBook = s.bookmarksByBook
+    if (s.currentBook) {
+      bookmarksByBook = { ...bookmarksByBook, [s.currentBook.id]: s.bookmarks }
+    }
+    const now = Date.now()
+    const opened = { ...book, lastReadAt: now }
+    set({
+      currentBook: opened,
+      currentView: 'reader',
+      books: sortBooksByRecent(
+        s.books.map((b) => (b.id === book.id ? opened : b))
+      ),
+      bookmarks: bookmarksByBook[book.id] ?? [],
+      bookmarksByBook,
+      aiContext: { bookTitle: opened.title },
+      aiDraft: null
+    })
+  },
 
   books: [],
   setBooks: (books) => set({ books }),
   addBook: (book) =>
     set((s) => {
       if (s.books.find((b) => b.path === book.path)) return s
-      return { books: [book, ...s.books] }
+      return { books: sortBooksByRecent([book, ...s.books]) }
     }),
   removeBook: (id) => set((s) => ({ books: s.books.filter((b) => b.id !== id) })),
   updateBookProgress: (id, progress, currentPage) =>
     set((s) => ({
-      books: s.books.map((b) =>
-        b.id === id ? { ...b, progress, currentPage, lastReadAt: Date.now() } : b
+      books: sortBooksByRecent(
+        s.books.map((b) =>
+          b.id === id ? { ...b, progress, currentPage, lastReadAt: Date.now() } : b
+        )
       )
     })),
 
@@ -169,10 +224,43 @@ export const useAppStore = create<AppState>((set, get) => ({
 
 
   bookmarks: [],
-  addBookmark: (bm) => set((s) => ({ bookmarks: [...s.bookmarks, bm] })),
-  removeBookmark: (index) => set((s) => ({ bookmarks: s.bookmarks.filter((_, i) => i !== index) })),
-  clearBookmarks: () => set({ bookmarks: [] }),
+  bookmarksByBook: {},
+  addBookmark: (bm) =>
+    set((s) => {
+      const next = [...s.bookmarks, bm]
+      const bookId = s.currentBook?.id
+      return {
+        bookmarks: next,
+        bookmarksByBook: bookId
+          ? { ...s.bookmarksByBook, [bookId]: next }
+          : s.bookmarksByBook
+      }
+    }),
+  removeBookmark: (index) =>
+    set((s) => {
+      const next = s.bookmarks.filter((_, i) => i !== index)
+      const bookId = s.currentBook?.id
+      return {
+        bookmarks: next,
+        bookmarksByBook: bookId
+          ? { ...s.bookmarksByBook, [bookId]: next }
+          : s.bookmarksByBook
+      }
+    }),
+  clearBookmarks: () =>
+    set((s) => {
+      const bookId = s.currentBook?.id
+      return {
+        bookmarks: [],
+        bookmarksByBook: bookId
+          ? { ...s.bookmarksByBook, [bookId]: [] }
+          : s.bookmarksByBook
+      }
+    }),
   setBookmarks: (bookmarks) => set({ bookmarks }),
+  setBookmarksByBook: (map) => set({ bookmarksByBook: map }),
+  syncBookmarksForBook: (bookId) =>
+    set((s) => ({ bookmarks: s.bookmarksByBook[bookId] ?? [] })),
 
   readingPosition: { percent: 0 },
   setReadingPosition: (pos) => set((s) => ({ readingPosition: { ...s.readingPosition, ...pos } })),
@@ -180,6 +268,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   navigateToPercent: null,
   setNavigateToPercent: (pct) => set({ navigateToPercent: pct }),
 
+  navigateToPage: null,
+  setNavigateToPage: (page) => set({ navigateToPage: page }),
+
   aiContext: { bookTitle: '' },
-  setAiContext: (ctx) => set((s) => ({ aiContext: { ...s.aiContext, ...ctx } }))
+  setAiContext: (ctx) => set((s) => ({ aiContext: { ...s.aiContext, ...ctx } })),
+
+  aiDraft: null,
+  setAiDraft: (draft) => set({ aiDraft: draft }),
+  requestAiPanel: false,
+  setRequestAiPanel: (open) => set({ requestAiPanel: open })
 }))

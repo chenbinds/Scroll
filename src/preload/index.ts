@@ -3,6 +3,17 @@ import { contextBridge, ipcRenderer } from 'electron'
 /** Fire bootstrap as soon as preload runs — overlaps with renderer bundle parse */
 const bootstrapPromise = ipcRenderer.invoke('app:bootstrap')
 
+function listenStreamChunk(
+  requestId: string,
+  onChunk: (chunk: string) => void
+): () => void {
+  const handler = (_e: Electron.IpcRendererEvent, data: { requestId: string; chunk: string }) => {
+    if (data.requestId === requestId) onChunk(data.chunk)
+  }
+  ipcRenderer.on('ai:stream-chunk', handler)
+  return () => ipcRenderer.removeListener('ai:stream-chunk', handler)
+}
+
 contextBridge.exposeInMainWorld('scrollAPI', {
   openBookDialog: () => ipcRenderer.invoke('dialog:openBook'),
   openMusicDialog: () => ipcRenderer.invoke('dialog:openMusic'),
@@ -22,6 +33,16 @@ contextBridge.exposeInMainWorld('scrollAPI', {
   bootstrap: () => bootstrapPromise,
 
   aiChat: (params: AiChatParams) => ipcRenderer.invoke('ai:chat', params),
+
+  aiChatStream: (params: AiChatStreamParams, onChunk: (chunk: string) => void) => {
+    const requestId = crypto.randomUUID()
+    const unlisten = listenStreamChunk(requestId, onChunk)
+    return ipcRenderer
+      .invoke('ai:chatStream', { ...params, requestId })
+      .finally(unlisten) as Promise<{ content: string }>
+  },
+
+  aiTestConnection: (params: AiTestParams) => ipcRenderer.invoke('ai:test', params),
 
   db: {},
 
@@ -45,6 +66,14 @@ export interface AiChatParams {
   maxTokens?: number
 }
 
+export interface AiChatStreamParams extends AiChatParams {}
+
+export interface AiTestParams {
+  baseUrl: string
+  apiKey: string
+  model: string
+}
+
 type DoubanSearchResult =
   | { ok: true; rating: number; url: string; title: string }
   | { ok: false; error: 'network' | 'timeout' | 'blocked' | 'not_found' | 'http' }
@@ -62,7 +91,7 @@ export interface ScrollAPI {
   onCloseRequested: (cb: () => void) => () => void
   bootstrap: () => Promise<{
     books: unknown[]
-    bookmarks: unknown
+    bookmarksByBook: unknown
     darkMode: unknown
     readingTheme: unknown
     readingFont: unknown
@@ -70,6 +99,8 @@ export interface ScrollAPI {
     aiConfig: unknown
   }>
   aiChat: (params: AiChatParams) => Promise<any>
+  aiChatStream: (params: AiChatStreamParams, onChunk: (chunk: string) => void) => Promise<{ content: string }>
+  aiTestConnection: (params: AiTestParams) => Promise<{ ok: true }>
   saveCover: (bookId: string, dataUrl: string) => Promise<string | null>
   db: Record<string, never>
   storage: {

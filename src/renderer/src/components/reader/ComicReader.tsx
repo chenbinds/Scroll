@@ -2,8 +2,13 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, SkipBack, SkipForward } from 'lucide-react'
 import { parseComic, type ComicPage } from '../../lib/comicParser'
 import { useAppStore } from '../../stores/appStore'
+import { useAnnotationStore } from '../../stores/annotationStore'
+import { annotationFormatForBook } from '../../lib/annotationTypes'
 import { useI18n } from '../../lib/i18n'
 import BackToLibraryButton from './BackToLibraryButton'
+import AnnotationToolbar from './annotation/AnnotationToolbar'
+import AnnotationOverlay from './annotation/AnnotationOverlay'
+import HighlightLayer from './annotation/HighlightLayer'
 
 interface Props {
   filePath: string
@@ -23,6 +28,21 @@ export default function ComicReader({ filePath, format, onClose, onPageChange, i
   const containerRef = useRef<HTMLDivElement>(null)
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const hasRestoredRef = useRef(false)
+  const currentBook = useAppStore((s) => s.currentBook)
+
+  useEffect(() => {
+    if (!currentBook?.id) return
+    void useAnnotationStore.getState().loadForBook(
+      currentBook.id,
+      annotationFormatForBook(currentBook.format)
+    )
+    return () => { useAnnotationStore.getState().reset() }
+  }, [currentBook?.id, currentBook?.format])
+
+  const requestClose = useCallback(() => {
+    const canLeave = useAnnotationStore.getState().requestLeave('library')
+    if (canLeave) onClose()
+  }, [onClose])
 
   // Load comic
   useEffect(() => {
@@ -40,6 +60,11 @@ export default function ComicReader({ filePath, format, onClose, onPageChange, i
         if (cancelled) return
 
         setPages(comicPages)
+        useAppStore.getState().setAiContext({
+          page: 1,
+          pageTotal: comicPages.length,
+          content: `[${format} comic] ${comicPages.length} pages — image-only, no extractable text.`
+        })
         setLoading(false)
       } catch (err) {
         if (cancelled) return
@@ -88,6 +113,11 @@ export default function ComicReader({ filePath, format, onClose, onPageChange, i
       if (closest !== currentPage) {
         setCurrentPage(closest)
         onPageChange?.(closest, pages.length)
+        useAppStore.getState().setAiContext({
+          page: closest,
+          pageTotal: pages.length,
+          content: `[${format} comic] Page ${closest}/${pages.length} — image-only content.`
+        })
       }
     }
 
@@ -96,7 +126,7 @@ export default function ComicReader({ filePath, format, onClose, onPageChange, i
     }
     container.addEventListener('scroll', onScroll, { passive: true })
     return () => container.removeEventListener('scroll', onScroll)
-  }, [pages, currentPage, onPageChange])
+  }, [pages, currentPage, onPageChange, format])
 
   // Navigation
   const goToPage = useCallback((page: number) => {
@@ -105,6 +135,14 @@ export default function ComicReader({ filePath, format, onClose, onPageChange, i
     const el = pageRefs.current.get(p)
     if (el) el.scrollIntoView({ block: 'start' })
   }, [pages.length])
+
+  const navigateToPage = useAppStore((s) => s.navigateToPage)
+  const setNavigateToPage = useAppStore((s) => s.setNavigateToPage)
+  useEffect(() => {
+    if (navigateToPage === null || pages.length === 0) return
+    goToPage(navigateToPage)
+    setNavigateToPage(null)
+  }, [navigateToPage, pages.length, goToPage, setNavigateToPage])
 
   const prevPage = useCallback(() => goToPage(currentPage - 1), [currentPage, goToPage])
   const nextPage = useCallback(() => goToPage(currentPage + 1), [currentPage, goToPage])
@@ -130,7 +168,8 @@ export default function ComicReader({ filePath, format, onClose, onPageChange, i
   return (
     <div className="reader-frame">
       <div className="reader-toolbar">
-        <BackToLibraryButton onClick={onClose} />
+        <BackToLibraryButton onClick={requestClose} />
+        <AnnotationToolbar />
 
         <div className="flex items-center gap-3">
           <span className="text-xs chrome-muted tabular-nums">{currentPage} / {pages.length}</span>
@@ -151,7 +190,8 @@ export default function ComicReader({ filePath, format, onClose, onPageChange, i
         </div>
       </div>
 
-      <div ref={containerRef} className="reader-scroll scrollbar-thin">
+      <div className="relative flex-1 min-h-0">
+        <div ref={containerRef} className="reader-scroll scrollbar-thin absolute inset-0">
         {loading && (
           <div className="flex items-center justify-center h-full">
             <div className="flex gap-1.5">
@@ -166,7 +206,7 @@ export default function ComicReader({ filePath, format, onClose, onPageChange, i
           <div className="flex items-center justify-center h-full">
             <div className="text-center text-red-500 px-6 max-w-md">
               <p className="text-sm">{error}</p>
-              <button onClick={onClose} className="mt-3 text-xs text-scroll-500 hover:underline">
+              <button onClick={requestClose} className="mt-3 text-xs text-scroll-500 hover:underline">
                 {t('app.backToLibrary')}
               </button>
             </div>
@@ -196,6 +236,14 @@ export default function ComicReader({ filePath, format, onClose, onPageChange, i
             </div>
           )
         })}
+        </div>
+
+        {!loading && !error && pages.length > 0 && (
+          <>
+            <HighlightLayer scrollRef={containerRef} layoutKey={scale} />
+            <AnnotationOverlay scrollRef={containerRef} layoutKey={scale} />
+          </>
+        )}
       </div>
 
       {/* Bottom navigation bar */}

@@ -110,7 +110,9 @@ export default function App() {
           }))
         )
       }
-      if (Array.isArray(data.bookmarks)) st.setBookmarks(data.bookmarks as any)
+      if (data.bookmarksByBook && typeof data.bookmarksByBook === 'object' && !Array.isArray(data.bookmarksByBook)) {
+        st.setBookmarksByBook(data.bookmarksByBook as Record<string, Parameters<typeof st.setBookmarks>[0]>)
+      }
       if (typeof data.darkMode === 'boolean') st.setDarkMode(data.darkMode)
       if (typeof data.readingTheme === 'string') st.setReadingTheme(data.readingTheme as any)
       if (typeof data.readingFont === 'string') st.setReadingFont(data.readingFont as any)
@@ -140,14 +142,14 @@ export default function App() {
     return () => clearTimeout(timer)
   }, [books, libraryReady])
 
-  const { bookmarks } = useAppStore()
+  const bookmarksByBook = useAppStore((s) => s.bookmarksByBook)
   useEffect(() => {
     if (!libraryReady) return
     const timer = setTimeout(() => {
-      window.scrollAPI.storage.set('bookmarks', bookmarks).catch(() => {})
+      window.scrollAPI.storage.set('bookmarksByBook', bookmarksByBook).catch(() => {})
     }, 500)
     return () => clearTimeout(timer)
-  }, [bookmarks, libraryReady])
+  }, [bookmarksByBook, libraryReady])
 
   const { aiConfig } = useAppStore()
   useEffect(() => {

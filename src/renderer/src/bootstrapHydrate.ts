@@ -21,7 +21,9 @@ export async function hydrateFromBootstrap(): Promise<void> {
         })) as Parameters<typeof st.setBooks>[0]
       )
     }
-    if (Array.isArray(data.bookmarks)) st.setBookmarks(data.bookmarks as Parameters<typeof st.setBookmarks>[0])
+    if (data.bookmarksByBook && typeof data.bookmarksByBook === 'object' && !Array.isArray(data.bookmarksByBook)) {
+      st.setBookmarksByBook(data.bookmarksByBook as Parameters<typeof st.setBookmarksByBook>[0])
+    }
     if (typeof data.darkMode === 'boolean') {
       st.setDarkMode(data.darkMode)
       document.documentElement.classList.toggle('dark', data.darkMode)

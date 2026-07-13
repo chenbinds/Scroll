@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { Book as BookIcon, Plus, FolderOpen } from 'lucide-react'
 import { useAppStore, type Book } from '../../stores/appStore'
 import { useI18n } from '../../lib/i18n'
@@ -37,6 +37,14 @@ interface Props {
 export default function LibraryView({ libraryReady }: Props) {
   const { t } = useI18n()
   const { books, addBook, openBook, removeBook } = useAppStore()
+
+  const sortedBooks = useMemo(
+    () =>
+      [...books].sort(
+        (a, b) => (b.lastReadAt ?? b.addedAt ?? 0) - (a.lastReadAt ?? a.addedAt ?? 0)
+      ),
+    [books]
+  )
 
   const handleImport = useCallback(async () => {
     if (!window.scrollAPI) {
@@ -96,6 +104,32 @@ export default function LibraryView({ libraryReady }: Props) {
     return fetchDoubanRating(book, t('library.unknownAuthor'))
   }, [t])
 
+  const handleSetManualRating = useCallback((bookId: string, rating: number | null) => {
+    patchBook(bookId, rating != null ? { doubanRating: rating } : { doubanRating: undefined })
+  }, [])
+
+  const handleRefreshCover = useCallback(async (book: Book) => {
+    const base64 = await window.scrollAPI.readPath(book.path)
+    if (!base64) throw new Error('read failed')
+    const fmt = book.format.toUpperCase()
+    let coverUrl: string | null = null
+    if (fmt === 'EPUB') {
+      const { extractEpubCover } = await import('../../lib/epubParser')
+      const raw = await extractEpubCover(base64)
+      if (raw) coverUrl = await compressCoverDataUrl(raw)
+    } else if (fmt === 'MOBI' || fmt === 'AZW' || fmt === 'AZW3') {
+      const { extractMobiCover } = await import('../../lib/mobiParser')
+      coverUrl = await extractMobiCover(base64)
+    } else if (fmt === 'CBZ' || fmt === 'CBR') {
+      const { parseComic } = await import('../../lib/comicParser')
+      const pages = await parseComic(base64, fmt as 'CBZ' | 'CBR')
+      if (pages[0]?.dataUrl) coverUrl = pages[0].dataUrl
+    }
+    if (!coverUrl) throw new Error('no cover')
+    const ref = await window.scrollAPI.saveCover(book.id, coverUrl)
+    patchBook(book.id, { coverUrl: ref || coverUrl })
+  }, [])
+
   return (
     <div className="h-full overflow-y-auto scrollbar-thin">
       {!libraryReady && (
@@ -131,7 +165,7 @@ export default function LibraryView({ libraryReady }: Props) {
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {t('library.title')} ({books.length})
+              {t('library.title')} ({sortedBooks.length})
             </h2>
             <div className="flex gap-2">
               <button
@@ -146,13 +180,15 @@ export default function LibraryView({ libraryReady }: Props) {
           </div>
 
           <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-3 [content-visibility:auto]">
-            {books.map((book) => (
+            {sortedBooks.map((book) => (
               <BookCard
                 key={book.id}
                 book={book}
                 onClick={() => openBook(book)}
                 onDelete={() => removeBook(book.id)}
                 onRefreshRating={() => handleRefreshRating(book)}
+                onSetManualRating={(rating) => handleSetManualRating(book.id, rating)}
+                onRefreshCover={() => handleRefreshCover(book)}
               />
             ))}
           </div>

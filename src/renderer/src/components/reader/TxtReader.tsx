@@ -3,9 +3,14 @@ import { ZoomIn, ZoomOut } from 'lucide-react'
 import { parseTxt, type TxtChapter } from '../../lib/txtParser'
 import { useAppStore } from '../../stores/appStore'
 import { useReaderFontSize } from '../../lib/useReaderFontSize'
+import { useAnnotationStore } from '../../stores/annotationStore'
+import { annotationFormatForBook } from '../../lib/annotationTypes'
 import ReaderThemeBar from './ReaderThemeBar'
 import BackToLibraryButton from './BackToLibraryButton'
-import { useI18n } from '../../lib/i18n'
+import AnnotationToolbar from './annotation/AnnotationToolbar'
+import AnnotationOverlay from './annotation/AnnotationOverlay'
+import HighlightLayer from './annotation/HighlightLayer'
+import MarkSelectionHandler from './annotation/MarkSelectionHandler'
 
 interface Props {
   filePath: string
@@ -15,7 +20,6 @@ interface Props {
 }
 
 export default function TxtReader({ filePath, onClose, onProgress, initialProgress }: Props) {
-  const { t } = useI18n()
   const [chapters, setChapters] = useState<TxtChapter[]>([])
   const [title, setTitle] = useState('')
   const [loading, setLoading] = useState(true)
@@ -23,8 +27,8 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
   const { fontSize, increaseFont, decreaseFont } = useReaderFontSize()
   const contentRef = useRef<HTMLDivElement | null>(null)
   const hasRestoredRef = useRef(false)
+  const currentBook = useAppStore((s) => s.currentBook)
 
-  // Callback ref: stores DOM el in Zustand for TocPanel
   const setContentRef = useCallback((el: HTMLDivElement | null) => {
     contentRef.current = el
     useAppStore.getState()._setReaderEl(el)
@@ -34,7 +38,20 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
     return () => { useAppStore.getState().setToc([]) }
   }, [])
 
-  // Load TXT
+  useEffect(() => {
+    if (!currentBook?.id) return
+    void useAnnotationStore.getState().loadForBook(
+      currentBook.id,
+      annotationFormatForBook(currentBook.format)
+    )
+    return () => { useAnnotationStore.getState().reset() }
+  }, [currentBook?.id, currentBook?.format])
+
+  const requestClose = useCallback(() => {
+    const canLeave = useAnnotationStore.getState().requestLeave('library')
+    if (canLeave) onClose()
+  }, [onClose])
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -55,14 +72,12 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
         setTitle(fileName)
         setChapters(parsed)
 
-        // TOC to sidebar
         useAppStore.getState().setToc(parsed.map((ch, i) => ({
           label: ch.title,
           href: `chapter-${i}`,
           spineIndex: i
         })))
 
-        // AI context
         if (parsed.length > 0) {
           useAppStore.getState().setAiContext({
             chapter: parsed[0].title,
@@ -71,7 +86,7 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
         }
 
         setLoading(false)
-      } catch (err) {
+      } catch {
         if (cancelled) return
         setError('Failed to load file.')
         setLoading(false)
@@ -81,7 +96,6 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
     return () => { cancelled = true }
   }, [filePath])
 
-  // Restore reading position
   useEffect(() => {
     if (chapters.length === 0 || !contentRef.current || hasRestoredRef.current) return
     if (!initialProgress || initialProgress <= 0 || initialProgress >= 100) return
@@ -95,7 +109,6 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
     })
   }, [chapters, initialProgress])
 
-  // Scroll progress
   useEffect(() => {
     if (!contentRef.current || loading) return
     const el = contentRef.current
@@ -105,6 +118,23 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
       const total = el.scrollHeight - el.clientHeight
       const pct = total > 0 ? Math.round((el.scrollTop / total) * 100) : 0
       onProgress?.(pct)
+
+      let chapterIdx = 0
+      const sections = el.querySelectorAll('[data-chapter]')
+      const containerRect = el.getBoundingClientRect()
+      const viewTop = containerRect.top + containerRect.height * 0.2
+      for (const sec of sections) {
+        const rect = sec.getBoundingClientRect()
+        if (rect.top <= viewTop) chapterIdx = Number((sec as HTMLElement).dataset.chapter) || 0
+        else break
+      }
+      const ch = chapters[chapterIdx]
+      if (ch) {
+        useAppStore.getState().setAiContext({
+          chapter: ch.title,
+          content: ch.content.slice(0, 5000)
+        })
+      }
     }
 
     const onScroll = () => {
@@ -114,7 +144,6 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
     return () => el.removeEventListener('scroll', onScroll)
   }, [loading, chapters, onProgress])
 
-  // Bookmark navigation
   const navigateToPercent = useAppStore((s) => s.navigateToPercent)
   const setNavigateToPercent = useAppStore((s) => s.setNavigateToPercent)
   useEffect(() => {
@@ -123,9 +152,22 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
     const total = el.scrollHeight - el.clientHeight
     if (total > 0) el.scrollTop = Math.round((total * navigateToPercent) / 100)
     setNavigateToPercent(null)
-  }, [navigateToPercent])
+  }, [navigateToPercent, setNavigateToPercent])
 
-  // Keyboard
+  const navigateToSpineIndex = useAppStore((s) => s.navigateToSpineIndex)
+  const setNavigateToSpineIndex = useAppStore((s) => s.setNavigateToSpineIndex)
+  useEffect(() => {
+    if (navigateToSpineIndex === null || !contentRef.current) return
+    const el = contentRef.current.querySelector(`[data-chapter="${navigateToSpineIndex}"]`) as HTMLElement | null
+    if (el) {
+      const container = contentRef.current
+      const containerRect = container.getBoundingClientRect()
+      const elRect = el.getBoundingClientRect()
+      container.scrollTop += elRect.top - containerRect.top - 80
+    }
+    setNavigateToSpineIndex(null)
+  }, [navigateToSpineIndex, setNavigateToSpineIndex])
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowDown' || e.key === 'j') contentRef.current?.scrollBy({ top: 80, behavior: 'smooth' })
@@ -139,49 +181,61 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
   return (
     <div className="reader-frame">
       <div className="reader-toolbar">
-        <BackToLibraryButton onClick={onClose} />
+        <BackToLibraryButton onClick={requestClose} />
+        <AnnotationToolbar />
+        <div className="flex items-center gap-2 shrink-0">
           <ReaderThemeBar />
-          
-        <div className="flex items-center gap-3">
-          <button onClick={decreaseFont} className="p-1 chrome-muted hover:opacity-80 transition-colors">
-            <ZoomOut size={16} />
-          </button>
-          <span className="text-xs chrome-muted tabular-nums w-10 text-center">{fontSize}%</span>
-          <button onClick={increaseFont} className="p-1 chrome-muted hover:opacity-80 transition-colors">
-            <ZoomIn size={16} />
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={decreaseFont} className="p-1 chrome-muted hover:opacity-80 transition-colors">
+              <ZoomOut size={16} />
+            </button>
+            <span className="text-xs chrome-muted tabular-nums w-10 text-center">{fontSize}%</span>
+            <button onClick={increaseFont} className="p-1 chrome-muted hover:opacity-80 transition-colors">
+              <ZoomIn size={16} />
+            </button>
+          </div>
         </div>
       </div>
 
-      <div ref={setContentRef} className="reader-scroll scrollbar-thin">
-        {loading && (
-          <div className="flex items-center justify-center h-full">
-            <div className="flex gap-1.5">
-              <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+      <div className="relative flex-1 min-h-0">
+        <div ref={setContentRef} className="reader-scroll scrollbar-thin absolute inset-0">
+          {loading && (
+            <div className="flex items-center justify-center h-full">
+              <div className="flex gap-1.5">
+                <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
             </div>
-          </div>
-        )}
-        {error && (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center text-red-500"><p className="text-sm">{error}</p></div>
-          </div>
-        )}
+          )}
+          {error && (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center text-red-500"><p className="text-sm">{error}</p></div>
+            </div>
+          )}
+          {!loading && !error && (
+            <div className="max-w-4xl mx-auto px-8 py-6 reader-content" style={{ fontSize: `${fontSize}%` }}>
+              <h1 className="text-2xl font-bold mb-8 text-center">{title}</h1>
+              {chapters.map((ch, i) => (
+                <section key={i} data-chapter={i} data-href={`chapter-${i}`} className="mb-8">
+                  {chapters.length > 1 && (
+                    <h2 className="font-bold text-lg mb-4">{ch.title}</h2>
+                  )}
+                  {ch.content.split('\n').map((para, j) =>
+                    para.trim() ? <p key={j}>{para}</p> : <br key={j} />
+                  )}
+                </section>
+              ))}
+            </div>
+          )}
+        </div>
+
         {!loading && !error && (
-          <div className="max-w-4xl mx-auto px-8 py-6 reader-content" style={{ fontSize: `${fontSize}%` }}>
-            <h1 className="text-2xl font-bold mb-8 text-center">{title}</h1>
-            {chapters.map((ch, i) => (
-              <section key={i} data-id={`chapter-${i}`} className="mb-8">
-                {chapters.length > 1 && (
-                  <h2 className="font-bold text-lg mb-4">{ch.title}</h2>
-                )}
-                {ch.content.split('\n').map((para, j) =>
-                  para.trim() ? <p key={j}>{para}</p> : <br key={j} />
-                )}
-              </section>
-            ))}
-          </div>
+          <>
+            <HighlightLayer scrollRef={contentRef} />
+            <AnnotationOverlay scrollRef={contentRef} />
+            <MarkSelectionHandler scrollRef={contentRef} />
+          </>
         )}
       </div>
     </div>

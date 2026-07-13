@@ -1,4 +1,94 @@
-import type { AnnotationStroke, BrushShape } from './annotationTypes'
+import type { AnnotationAnchor, AnnotationStroke, BrushShape } from './annotationTypes'
+
+export function isPageLocalAnchor(anchor: AnnotationAnchor): boolean {
+  return anchor.type === 'pdf-page'
+}
+
+export function getPageElement(scrollEl: HTMLElement, pageNum: number): HTMLElement | null {
+  return scrollEl.querySelector(`[data-page="${pageNum}"]`) as HTMLElement | null
+}
+
+export function getPageBoxInScroll(
+  scrollEl: HTMLElement,
+  pageEl: HTMLElement
+): { left: number; top: number; width: number; height: number } {
+  const scrollRect = scrollEl.getBoundingClientRect()
+  const pageRect = pageEl.getBoundingClientRect()
+  return {
+    left: scrollEl.scrollLeft + (pageRect.left - scrollRect.left),
+    top: scrollEl.scrollTop + (pageRect.top - scrollRect.top),
+    width: Math.max(1, pageRect.width),
+    height: Math.max(1, pageRect.height)
+  }
+}
+
+export function clientToPageNormalized(
+  clientX: number,
+  clientY: number,
+  pageEl: HTMLElement
+): [number, number] {
+  const rect = pageEl.getBoundingClientRect()
+  return [
+    Math.max(0, Math.min(1, (clientX - rect.left) / Math.max(1, rect.width))),
+    Math.max(0, Math.min(1, (clientY - rect.top) / Math.max(1, rect.height)))
+  ]
+}
+
+/** Map page-local 0~1 coords to document pixel space for drawing / hit-test */
+export function pageLocalToDocPixel(
+  nx: number,
+  ny: number,
+  scrollEl: HTMLElement,
+  pageNum: number
+): [number, number] | null {
+  const pageEl = getPageElement(scrollEl, pageNum)
+  if (!pageEl) return null
+  const box = getPageBoxInScroll(scrollEl, pageEl)
+  return [box.left + nx * box.width, box.top + ny * box.height]
+}
+
+export function drawStrokeOnScroll(
+  ctx: CanvasRenderingContext2D,
+  stroke: AnnotationStroke,
+  scrollEl: HTMLElement
+): void {
+  if (isPageLocalAnchor(stroke.anchor)) {
+    const pageEl = getPageElement(scrollEl, stroke.anchor.pageNum)
+    if (!pageEl) return
+    const box = getPageBoxInScroll(scrollEl, pageEl)
+    ctx.save()
+    ctx.translate(box.left, box.top)
+    drawStrokeOnCanvas(ctx, stroke, box.width, box.height)
+    ctx.restore()
+    return
+  }
+  drawStrokeOnCanvas(ctx, stroke, scrollEl.scrollWidth, scrollEl.scrollHeight)
+}
+
+export function hitTestStrokeOnScroll(
+  stroke: AnnotationStroke,
+  clientX: number,
+  clientY: number,
+  scrollEl: HTMLElement
+): boolean {
+  const scrollRect = scrollEl.getBoundingClientRect()
+  const docX = scrollEl.scrollLeft + (clientX - scrollRect.left)
+  const docY = scrollEl.scrollTop + (clientY - scrollRect.top)
+
+  if (isPageLocalAnchor(stroke.anchor)) {
+    const pageEl = getPageElement(scrollEl, stroke.anchor.pageNum)
+    if (!pageEl) return false
+    const box = getPageBoxInScroll(scrollEl, pageEl)
+    const nx = (docX - box.left) / box.width
+    const ny = (docY - box.top) / box.height
+    if (nx < 0 || nx > 1 || ny < 0 || ny > 1) return false
+    return hitTestStroke(stroke, nx, ny, box.width, box.height)
+  }
+
+  const docW = Math.max(1, scrollEl.scrollWidth)
+  const docH = Math.max(1, scrollEl.scrollHeight)
+  return hitTestStroke(stroke, docX / docW, docY / docH, docW, docH)
+}
 
 export function normalizedToPixel(
   nx: number,

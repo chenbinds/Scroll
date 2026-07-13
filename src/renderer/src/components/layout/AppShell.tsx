@@ -12,8 +12,20 @@ interface Props {
 }
 
 export default function AppShell({ children, onOpenSettings }: Props) {
-  const { leftSidebarOpen, rightSidebarOpen, currentView } = useAppStore()
+  const leftSidebarOpen = useAppStore((s) => s.leftSidebarOpen)
+  const rightSidebarOpen = useAppStore((s) => s.rightSidebarOpen)
+  const currentView = useAppStore((s) => s.currentView)
+  const requestAiPanel = useAppStore((s) => s.requestAiPanel)
+  const setRequestAiPanel = useAppStore((s) => s.setRequestAiPanel)
+  const toggleRightSidebar = useAppStore((s) => s.toggleRightSidebar)
   const [musicReady, setMusicReady] = useState(false)
+
+  useEffect(() => {
+    if (requestAiPanel && currentView === 'reader') {
+      if (!rightSidebarOpen) toggleRightSidebar()
+      setRequestAiPanel(false)
+    }
+  }, [requestAiPanel, currentView, rightSidebarOpen, toggleRightSidebar, setRequestAiPanel])
 
   // Defer music player until after first paint / idle
   useEffect(() => {

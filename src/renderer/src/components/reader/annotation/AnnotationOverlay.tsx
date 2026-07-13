@@ -3,9 +3,14 @@ import { useAnnotationStore } from '../../../stores/annotationStore'
 import { useAppStore } from '../../../stores/appStore'
 import {
   drawStrokeOnCanvas,
-  hitTestStroke,
+  drawStrokeOnScroll,
+  hitTestStrokeOnScroll,
+  clientToPageNormalized,
+  getPageElement,
   isClickShape,
-  isDragShape
+  isDragShape,
+  isPageLocalAnchor,
+  getPageBoxInScroll
 } from '../../../lib/annotationDraw'
 import type { AnnotationStroke, BrushShape, AnnotationAnchor } from '../../../lib/annotationTypes'
 
@@ -16,8 +21,8 @@ interface Props {
 }
 
 type Draft =
-  | { mode: 'drag'; shape: BrushShape; points: [number, number][]; lastPx: [number, number] | null }
-  | { mode: 'click'; shape: BrushShape; points: [number, number][] }
+  | { mode: 'drag'; shape: BrushShape; points: [number, number][]; lastPx: [number, number] | null; pageNum?: number }
+  | { mode: 'click'; shape: BrushShape; points: [number, number][]; pageNum?: number }
 
 function findContentAnchor(
   scrollEl: HTMLElement,
@@ -141,7 +146,7 @@ export default function AnnotationOverlay({ scrollRef, layoutKey }: Props) {
     ctx.translate(-scrollEl.scrollLeft, -scrollEl.scrollTop)
 
     for (const stroke of strokes) {
-      drawStrokeOnCanvas(ctx, stroke, docW, docH)
+      drawStrokeOnScroll(ctx, stroke, scrollEl)
     }
 
     const draft = draftRef.current
@@ -150,18 +155,25 @@ export default function AnnotationOverlay({ scrollRef, layoutKey }: Props) {
         draft.mode === 'drag'
           ? finalizeDragPoints(draft.shape, draft.points)
           : draft.points
-      drawStrokeOnCanvas(
-        ctx,
-        {
-          shape: draft.shape,
-          points: pts,
-          color: brush.color,
-          opacity: brush.opacity,
-          lineWidth: brush.lineWidth
-        },
-        docW,
-        docH
-      )
+      const draftStroke = {
+        shape: draft.shape,
+        points: pts,
+        color: brush.color,
+        opacity: brush.opacity,
+        lineWidth: brush.lineWidth
+      }
+      if (draft.pageNum != null) {
+        const pageEl = getPageElement(scrollEl, draft.pageNum)
+        if (pageEl) {
+          const box = getPageBoxInScroll(scrollEl, pageEl)
+          ctx.save()
+          ctx.translate(box.left, box.top)
+          drawStrokeOnCanvas(ctx, draftStroke, box.width, box.height)
+          ctx.restore()
+        }
+      } else {
+        drawStrokeOnCanvas(ctx, draftStroke, docW, docH)
+      }
     }
     ctx.restore()
   }, [scrollRef, strokes, brush])
@@ -224,6 +236,7 @@ export default function AnnotationOverlay({ scrollRef, layoutKey }: Props) {
     (shape: BrushShape, points: [number, number][], clientX: number, clientY: number) => {
       const scrollEl = scrollRef.current
       if (!scrollEl || points.length < 2) return
+      const anchor = findContentAnchor(scrollEl, clientX, clientY)
       const stroke: AnnotationStroke = {
         id: crypto.randomUUID(),
         tool: 'brush',
@@ -232,7 +245,7 @@ export default function AnnotationOverlay({ scrollRef, layoutKey }: Props) {
         color: brush.color,
         opacity: brush.opacity,
         lineWidth: brush.lineWidth,
-        anchor: findContentAnchor(scrollEl, clientX, clientY),
+        anchor,
         createdAt: Date.now()
       }
       addStroke(stroke)
@@ -240,20 +253,31 @@ export default function AnnotationOverlay({ scrollRef, layoutKey }: Props) {
     [addStroke, brush, scrollRef]
   )
 
+  const pointerToNormalized = useCallback(
+    (clientX: number, clientY: number, scrollEl: HTMLElement): [number, number] => {
+      const anchor = findContentAnchor(scrollEl, clientX, clientY)
+      if (isPageLocalAnchor(anchor) && anchor.type === 'pdf-page') {
+        const pageEl = getPageElement(scrollEl, anchor.pageNum)
+        if (pageEl) return clientToPageNormalized(clientX, clientY, pageEl)
+      }
+      return clientToDocNormalized(clientX, clientY, scrollEl)
+    },
+    [scrollRef]
+  )
+
   const eraseAt = useCallback(
     (clientX: number, clientY: number) => {
       const scrollEl = scrollRef.current
       if (!scrollEl) return
-      const [nx, ny] = clientToDocNormalized(clientX, clientY, scrollEl)
-      const docW = scrollEl.scrollWidth
-      const docH = scrollEl.scrollHeight
       for (let i = strokes.length - 1; i >= 0; i--) {
-        if (hitTestStroke(strokes[i], nx, ny, docW, docH)) {
+        if (hitTestStrokeOnScroll(strokes[i], clientX, clientY, scrollEl)) {
           removeStroke(strokes[i].id)
           return
         }
       }
-      // Also erase highlights
+      const [nx, ny] = pointerToNormalized(clientX, clientY, scrollEl)
+      const docW = scrollEl.scrollWidth
+      const docH = scrollEl.scrollHeight
       for (let i = highlights.length - 1; i >= 0; i--) {
         const hl = highlights[i]
         for (const [rx, ry, rw, rh] of hl.rects) {
@@ -264,7 +288,7 @@ export default function AnnotationOverlay({ scrollRef, layoutKey }: Props) {
         }
       }
     },
-    [highlights, removeHighlight, removeStroke, scrollRef, strokes]
+    [highlights, pointerToNormalized, removeHighlight, removeStroke, scrollRef, strokes]
   )
 
   const onPointerDown = useCallback(
@@ -286,8 +310,10 @@ export default function AnnotationOverlay({ scrollRef, layoutKey }: Props) {
       e.stopPropagation()
       setPanelOpen(false)
 
-      const pt = clientToDocNormalized(e.clientX, e.clientY, scrollEl)
+      const pt = pointerToNormalized(e.clientX, e.clientY, scrollEl)
       const shape = brush.shape
+      const anchor = findContentAnchor(scrollEl, e.clientX, e.clientY)
+      const pageNum = anchor.type === 'pdf-page' ? anchor.pageNum : undefined
 
       if (isClickShape(shape)) {
         const existing = draftRef.current
@@ -306,7 +332,7 @@ export default function AnnotationOverlay({ scrollRef, layoutKey }: Props) {
           redraw()
           return
         }
-        draftRef.current = { mode: 'click', shape, points: [pt] }
+        draftRef.current = { mode: 'click', shape, points: [pt], pageNum }
         setHasClickDraft(true)
         redraw()
         return
@@ -314,7 +340,7 @@ export default function AnnotationOverlay({ scrollRef, layoutKey }: Props) {
 
       if (isDragShape(shape)) {
         e.currentTarget.setPointerCapture(e.pointerId)
-        draftRef.current = { mode: 'drag', shape, points: [pt], lastPx: pt }
+        draftRef.current = { mode: 'drag', shape, points: [pt], lastPx: pt, pageNum }
         setHasClickDraft(false)
         redraw()
       }
@@ -335,7 +361,7 @@ export default function AnnotationOverlay({ scrollRef, layoutKey }: Props) {
       const draft = draftRef.current
       if (!draft || draft.mode !== 'drag') return
 
-      const pt = clientToDocNormalized(e.clientX, e.clientY, scrollEl)
+      const pt = pointerToNormalized(e.clientX, e.clientY, scrollEl)
       if (draft.shape === 'curve') {
         const last = draft.lastPx
         if (last && minDist(last, pt, scrollEl.scrollWidth, scrollEl.scrollHeight) < 3) return

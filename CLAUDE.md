@@ -65,10 +65,10 @@ MOBI/AZW3 → foliate-js (mobi.js) → MobiReader 全量渲染
 | 格式 | 组件 | 状态 |
 |------|------|------|
 | EPUB | EpubReader | ✅ 含标注全套 |
-| TXT/MD | TxtReader | ✅ 阅读；标注未接 |
+| TXT/MD | TxtReader | ✅ 阅读 + 标注全套 |
 | PDF | PdfReader | ✅ 画笔/橡皮；标记禁用 |
 | MOBI/AZW3 | MobiReader | ✅ foliate-js；含标注 |
-| CBZ | ComicReader | ✅ 阅读；标注未接 |
+| CBZ/CBR | ComicReader | ✅ 阅读 + 按页画笔 |
 | CBR | ComicReader | ⚠️ 仅 RAR stored，未实测 |
 | DJVU | ReaderView | ❌ 占位 |
 
@@ -111,11 +111,12 @@ MOBI/AZW3 → foliate-js (mobi.js) → MobiReader 全量渲染
 - foliate-js MOBI、封面落盘、侧栏拖动/折叠
 - 启动多轮优化、阅读主题整窗、书架卡片缩小
 - 豆瓣评分错误反馈、全局字号持久化
-- 阅读标注（EPUB/MOBI/AZW3；PDF 画笔）+ 统一离开弹窗
+- 阅读标注（EPUB/MOBI/AZW3/TXT；PDF/CBZ 画笔）+ 统一离开弹窗
+- AI 流式/会话/选区；豆瓣手动评分；书架按最近打开排序
 
 ## 待实现
 
-见根目录 **`TODO.md`**（含音乐 / AI / 标注后续 / DJVU / CBR 等）。
+见根目录 **`TODO.md`**（**下一窗口优先 P3 音乐**；P0 抽验、P2 格式补齐等）。
 
 ## PowerShell
 

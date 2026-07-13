@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { X, Eye, EyeOff, Save, Trash2, Globe, Key, Cpu, Sparkles } from 'lucide-react'
+import { X, Eye, EyeOff, Save, Trash2, Globe, Key, Cpu, Sparkles, Wifi } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useI18n, type Language } from '../../lib/i18n'
+import { testConnection } from '../../lib/aiService'
 
 interface Props {
   onClose: () => void
@@ -25,6 +26,8 @@ export default function SettingsDialog({ onClose }: Props) {
   const [apiKey, setApiKey] = useState(aiConfig.apiKey)
   const [model, setModel] = useState(aiConfig.model)
   const [saved, setSaved] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<string | null>(null)
 
   const handlePreset = (key: string) => {
     const preset = AI_PRESETS[key]
@@ -40,6 +43,24 @@ export default function SettingsDialog({ onClose }: Props) {
   const handleClear = () => {
     setName(''); setBaseUrl(''); setApiKey(''); setModel('')
     setAiConfig({ name: '', baseUrl: '', apiKey: '', model: '', maxTokens: 4096 })
+    setTestResult(null)
+  }
+
+  const handleTest = async () => {
+    if (!baseUrl || !apiKey || !model) {
+      setTestResult(t('settings.ai.testMissing'))
+      return
+    }
+    setTesting(true)
+    setTestResult(null)
+    try {
+      await testConnection({ baseUrl, apiKey, model })
+      setTestResult(t('settings.ai.testOk'))
+    } catch (err) {
+      setTestResult(err instanceof Error ? err.message : t('settings.ai.testFailed'))
+    } finally {
+      setTesting(false)
+    }
   }
 
   return (
@@ -121,6 +142,24 @@ export default function SettingsDialog({ onClose }: Props) {
                 className="w-full rounded-lg border border-gray-300 dark:border-gray-700
                            bg-white dark:bg-gray-800 px-3 py-2 text-sm font-mono text-gray-900 dark:text-gray-100
                            focus:outline-none focus:ring-2 focus:ring-scroll-500/50" />
+            </div>
+
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { void handleTest() }}
+                disabled={testing}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700
+                           hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
+              >
+                <Wifi size={12} className={testing ? 'animate-pulse' : ''} />
+                {testing ? t('settings.ai.testing') : t('settings.ai.testConnection')}
+              </button>
+              {testResult && (
+                <span className={`text-xs ${testResult === t('settings.ai.testOk') ? 'text-green-600' : 'text-red-500'}`}>
+                  {testResult}
+                </span>
+              )}
             </div>
           </section>
 

@@ -39,24 +39,34 @@ export async function chat(
 }
 
 /**
- * 流式聊天（模拟 — 逐段返回）
- * 注意：当前实现是非流式的，后续可升级为 SSE
+ * 流式聊天 — 主进程 SSE，逐 chunk 回调
  */
 export async function chatStream(
   messages: AiMessage[],
   options: AiChatOptions,
   onChunk: (text: string) => void
 ): Promise<string> {
-  const fullText = await chat(messages, options)
-
-  // 模拟流式输出效果
-  const chunks = splitIntoChunks(fullText, 10)
-  for (const chunk of chunks) {
-    onChunk(chunk)
-    await sleep(30)
+  const params: AiChatParams = {
+    baseUrl: options.baseUrl,
+    apiKey: options.apiKey,
+    model: options.model,
+    messages,
+    maxTokens: options.maxTokens || 4096
   }
 
-  return fullText
+  const result = await window.scrollAPI.aiChatStream(params, onChunk)
+  return result.content || ''
+}
+
+/**
+ * 测试 API 连通性
+ */
+export async function testConnection(options: Omit<AiChatOptions, 'maxTokens'>): Promise<void> {
+  await window.scrollAPI.aiTestConnection({
+    baseUrl: options.baseUrl,
+    apiKey: options.apiKey,
+    model: options.model
+  })
 }
 
 /**
@@ -148,18 +158,5 @@ export async function explain(
 }
 
 // ============================================================
-// 工具函数
+// 工具函数（保留供未来扩展）
 // ============================================================
-
-function splitIntoChunks(text: string, count: number): string[] {
-  const chunkSize = Math.ceil(text.length / count)
-  const chunks: string[] = []
-  for (let i = 0; i < text.length; i += chunkSize) {
-    chunks.push(text.slice(i, i + chunkSize))
-  }
-  return chunks
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}

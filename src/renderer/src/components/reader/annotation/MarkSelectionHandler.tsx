@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, X } from 'lucide-react'
 import { useAnnotationStore } from '../../../stores/annotationStore'
+import { useAppStore } from '../../../stores/appStore'
 import { useI18n } from '../../../lib/i18n'
 import { selectionToNormRects } from './HighlightLayer'
 import type { AnnotationHighlight, EpubAnchor, NormRect } from '../../../lib/annotationTypes'
@@ -314,12 +315,14 @@ export default function MarkSelectionHandler({ scrollRef }: Props) {
       {popup && (
         <div
           ref={popupRef}
-          className="fixed z-[60] w-[260px] chrome-surface-raised rounded-lg shadow-lg
+          className="fixed z-[60] flex flex-col w-[260px] min-w-[220px] min-h-[160px]
+                     max-w-[min(480px,92vw)] max-h-[min(520px,75vh)]
+                     overflow-auto resize chrome-surface-raised rounded-lg shadow-lg
                      border border-[var(--reader-border)] p-3"
           style={{ left: popup.popupLeft, top: popup.popupTop }}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-2 shrink-0">
             <span className="text-sm font-medium">{t('annotation.noteTitle')}</span>
             <button
               type="button"
@@ -331,7 +334,7 @@ export default function MarkSelectionHandler({ scrollRef }: Props) {
             </button>
           </div>
           {popup.text ? (
-            <p className="text-[11px] chrome-muted mb-1.5 line-clamp-2 leading-snug">
+            <p className="text-[11px] chrome-muted mb-1.5 line-clamp-2 leading-snug shrink-0">
               {popup.text}
             </p>
           ) : null}
@@ -343,7 +346,7 @@ export default function MarkSelectionHandler({ scrollRef }: Props) {
             }
             maxLength={NOTE_MAX_LENGTH}
             rows={4}
-            className="w-full resize-none text-sm rounded border border-[var(--reader-border)]
+            className="flex-1 min-h-[88px] w-full resize-none text-sm rounded border border-[var(--reader-border)]
                        bg-[var(--reader-bg)] px-2 py-1.5 outline-none focus:ring-1 focus:ring-scroll-400"
             placeholder={t('annotation.notePlaceholder')}
             onKeyDown={(e) => {
@@ -351,7 +354,24 @@ export default function MarkSelectionHandler({ scrollRef }: Props) {
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSave()
             }}
           />
-          <div className="flex items-center justify-end gap-2 mt-2">
+          <div className="flex items-center justify-between gap-2 mt-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                const text = (popup.note || popup.text || '').trim()
+                if (text) {
+                  useAppStore.getState().setAiContext({ selection: text.slice(0, 3000) })
+                  useAppStore.getState().setAiDraft(
+                    `${t('ai.askAboutSelection')}\n「${text.slice(0, 200)}${text.length > 200 ? '…' : ''}」\n\n`
+                  )
+                  useAppStore.getState().setRequestAiPanel(true)
+                }
+              }}
+              className="text-[11px] text-scroll-600 hover:underline"
+            >
+              {t('ai.askAi')}
+            </button>
+            <div className="flex items-center gap-2">
             <span className="text-[11px] chrome-muted tabular-nums">
               {popup.note.length}/{NOTE_MAX_LENGTH}
             </span>
@@ -364,6 +384,7 @@ export default function MarkSelectionHandler({ scrollRef }: Props) {
             >
               <Check size={18} />
             </button>
+            </div>
           </div>
         </div>
       )}
