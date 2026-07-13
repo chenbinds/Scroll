@@ -166,3 +166,27 @@
 - Handoff 归档至 `Information/archive/`；现行 `Information/Handoff_标注_2026-07-13.md`
 - 新增根目录 `TODO.md`（音乐 / AI / 标注后续 / DJVU 等）
 - 更新 `HANDOFF.md`、`CLAUDE.md`、`.gitignore`
+
+---
+
+## 2026-07-14 — 音乐 P3、Z-Library、一键打包
+
+### 音乐 P3
+- `musicStorage.ts`：播放列表 / 音量 / 当前曲持久化（`music_state`）
+- 添加 URL 弹窗；本地路径缺失检测（`fs:pathExists`）
+- 迷你条改文档流布局；阅读快捷键守卫 `readerShortcuts.ts`；Esc 暂停
+
+### 书架
+- Z-Library 按钮 → `openExternal('https://zlib.ch')`
+- 豆瓣评分改内联弹窗（`BookCard.tsx`）
+
+### 打包分发
+- **`pack.bat`** + `scripts/pack.ps1` + `scripts/pack-release.ps1`
+- `electron-builder.yml`：便携 exe、禁用代码签名
+- `.npmrc`：npmmirror 镜像
+- 输出 `dist/Scroll-{ver}-win-x64.zip` + UTF-8 BOM `README.txt`
+- 文档：`docs/05-packaging.md`；`Information/Handoff_2026-07-14.md`
+
+### 文档整理
+- 更新 `TODO.md`、`HANDOFF.md`、`CLAUDE.md`、`README.md`
+- 音乐 handoff 标 P3 完成；旧新窗口 handoff 标过时

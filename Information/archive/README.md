@@ -4,9 +4,11 @@
 
 当前有效入口：
 
+- **项目现状：** `../Handoff_2026-07-14.md`
 - 快速索引：`../HANDOFF.md`（仓库根）
 - 标注现状：`../Handoff_标注_2026-07-13.md`
 - 待办：`../../TODO.md`
+- 打包：`../../docs/05-packaging.md`
 - 项目指令：`../../CLAUDE.md`
 
 本目录内容：
@@ -18,4 +20,4 @@
 | `Handoff_foliate启动优化_2026-07-13.md` | foliate MOBI / 启动优化交接 |
 | `research/mobi-parser-snippet.txt` | 早期 MOBI 解析调研片段（已废弃；现用 foliate-js） |
 
-根目录已删除的废弃脚本：`copy_calibre.bat`、`install_calibre.bat`、`setup_calibre.bat`、`make.bat`（打包请用 `build.bat`）。
+根目录已删除的废弃脚本：`copy_calibre.bat`、`install_calibre.bat`、`setup_calibre.bat`、`make.bat`（打包请用 **`pack.bat`**）。

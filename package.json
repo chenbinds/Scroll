@@ -10,8 +10,9 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "package": "electron-vite build && electron-builder --win",
+    "package": "electron-vite build && electron-builder --win portable",
     "package:portable": "electron-vite build && electron-builder --win portable",
+    "pack": "electron-vite build && electron-builder --win portable",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit"
   },

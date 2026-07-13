@@ -1,0 +1,85 @@
+# 卷轴 Scroll — 打包与分发
+
+> 更新：2026-07-14
+
+## 给谁用
+
+| 角色 | 需要什么 | 做什么 |
+|------|----------|--------|
+| **开发者（你）** | Node.js 20+ | 双击 `pack.bat` 生成 zip |
+| **收包人** | 无 | 解压 zip，双击 `Scroll.exe` |
+
+## 一键打包
+
+```text
+双击 pack.bat
+（或 build.bat — 同 pack.bat）
+```
+
+流程（`scripts/pack.ps1`）：
+
+1. 检查 / 安装 `node_modules`（仅首次）
+2. `electron-vite build` → `out/`
+3. `electron-builder --win portable` → `release/Scroll.exe`
+4. 复制 exe + 生成 `README.txt` → `dist/Scroll-{version}-win-x64/`
+5. 打 zip → `dist/Scroll-{version}-win-x64.zip`
+6. 自动打开 `dist` 文件夹
+
+### 输出物
+
+```text
+dist/
+  Scroll-0.1.0-win-x64/
+    Scroll.exe      # 便携单文件，~70MB
+    README.txt      # 中英文使用说明（UTF-8 BOM）
+  Scroll-0.1.0-win-x64.zip   # 发给他人
+```
+
+`release/`、`out/`、`dist/` 均在 `.gitignore` 中，**不提交 Git**。
+
+## 配置要点
+
+| 文件 | 作用 |
+|------|------|
+| `electron-builder.yml` | 便携 exe、禁用代码签名（免 winCodeSign） |
+| `.npmrc` | electron / builder 国内镜像 |
+| `scripts/README.dist.txt` | 发布包说明模板 |
+| `tools/offline/` | 可选：预置 builder 离线 `.7z`（见该目录 README） |
+
+打包环境变量（`pack.ps1` 自动设置）：
+
+- `ELECTRON_MIRROR`、`ELECTRON_BUILDER_BINARIES_MIRROR` → npmmirror
+- `CSC_IDENTITY_AUTO_DISCOVERY=false` → 不下载 winCodeSign
+
+## 开发 vs 发布启动
+
+| 场景 | 启动 |
+|------|------|
+| 改代码后自测 | `rebuild.bat` + `Scroll.vbs`（跑 `out/`） |
+| 测便携包 | 直接运行 `release/Scroll.exe` 或 zip 内 exe |
+| 热重载开发 | `start.bat` |
+
+`Scroll.vbs` 逻辑：若存在 `release/Scroll.exe` 则优先用它，否则用 `node_modules/electron` + `out/main/index.js`。
+
+## 常见问题
+
+**pack 卡在下载 / 很慢**  
+首次需拉 NSIS 等 builder 工具；已配国内镜像。可将 `nsis-*.7z` 放入 `tools/offline/` 后重试。
+
+**README 乱码**  
+发布包内应为 `README.txt`（UTF-8 BOM）。勿用旧版 `使用说明.txt`。
+
+**杀软误报**  
+未签名便携 exe 可能被 Defender 拦截；收包人需加信任。见 TODO P6。
+
+**main/preload 改代码后**  
+便携包需重新 `pack.bat`；开发时改 main/preload 须完全退出再启 `Scroll.vbs`。
+
+## npm 脚本（可选）
+
+```powershell
+npm run build          # 仅编译 out/
+npm run pack           # build + electron-builder portable（不含 dist zip）
+```
+
+完整 zip 仍推荐 **`pack.bat`**（含第 4 步 dist 整理）。

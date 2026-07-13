@@ -12,6 +12,10 @@ win:
     - target: portable
       arch: [x64]
   artifactName: Scroll.exe
+  sign: null
+  signDlls: false
+  signAndEditExecutable: false
+  verifyUpdateCodeSignature: false
 portable:
   artifactName: Scroll.exe
 asar: true

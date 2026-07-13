@@ -67,8 +67,9 @@ yarn-debug.log*
 yarn-error.log*
 tmp/
 temp/
-tools/
 calibre-portable/
+tools/offline/*.7z
+winCodeSign*.7z
 
 # electron-vite / 调试残留
 electron.vite.config.*.mjs

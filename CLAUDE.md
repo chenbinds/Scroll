@@ -16,10 +16,11 @@
 
 | 用途 | 命令/文件 | 说明 |
 |------|-----------|------|
-| 日常 | `Scroll.vbs` | 优先 `release/Scroll.exe`，否则 electron + `out/` |
-| 构建 | `rebuild.bat` | 只构建到 `out/` |
-| 打包 | `build.bat` | 构建 + 便携 `release/Scroll.exe`（推荐日常） |
-| 开发 | `start.bat` | electron-vite dev，调试用 |
+| 开发日常 | `Scroll.vbs` | 优先 `release/Scroll.exe`，否则 electron + `out/` |
+| 仅构建 | `rebuild.bat` | 只构建到 `out/` |
+| **分发打包** | **`pack.bat`** | 便携 exe + `dist/*.zip`（见 `docs/05-packaging.md`） |
+| 兼容入口 | `build.bat` | 转发至 `pack.bat` |
+| 开发 | `start.bat` | electron-vite dev |
 | 首次安装 | `install.bat` | `npm install`（仅新机/清依赖后） |
 
 **已废弃（勿用）：** `install_calibre.bat` / `setup_calibre.bat` / `copy_calibre.bat` — MOBI 已改 foliate-js，禁止捆绑 Calibre。
@@ -45,11 +46,18 @@ Scroll/
 │           ├── mobiParser.ts     # MOBI：foliate-js 封装
 │           ├── annotation*.ts    # 标注类型 / 绘制 / 存储
 │           ├── readingTheme.ts   # 阅读主题 + 整窗 CSS 变量
-│           └── useReaderFontSize.ts
-├── Information/        # 最新 handoff；archive/ 为历史稿
-├── TODO.md             # 待完成 / 待验收清单
-├── out/                # electron-vite 构建产物
-└── release/            # electron-builder 便携包 Scroll.exe
+│       └── lib/
+│           ├── musicStorage.ts     # 音乐持久化
+│           ├── readerShortcuts.ts  # 阅读快捷键守卫
+│           └── ...
+├── scripts/            # pack.ps1、pack-release.ps1、README.dist.txt
+├── tools/offline/      # 可选 builder 离线包（*.7z 不提交）
+├── Information/        # Handoff；Handoff_2026-07-14.md 为最新
+├── docs/               # 含 05-packaging.md
+├── TODO.md
+├── pack.bat            # 一键打包 → dist/*.zip
+├── out/                # electron-vite 构建产物（gitignore）
+└── release/            # electron-builder 便携 exe（gitignore）
 ```
 
 ## MOBI/AZW3
@@ -113,10 +121,11 @@ MOBI/AZW3 → foliate-js (mobi.js) → MobiReader 全量渲染
 - 豆瓣评分错误反馈、全局字号持久化
 - 阅读标注（EPUB/MOBI/AZW3/TXT；PDF/CBZ 画笔）+ 统一离开弹窗
 - AI 流式/会话/选区；豆瓣手动评分；书架按最近打开排序
+- 音乐 P3（持久化、弹窗、阅读冲突）；Z-Library 外链；`pack.bat` 分发打包
 
 ## 待实现
 
-见根目录 **`TODO.md`**（**下一窗口优先 P3 音乐**；P0 抽验、P2 格式补齐等）。
+见根目录 **`TODO.md`**（**P0 抽验、P2 格式补齐、P6 杀软** 等）。
 
 ## PowerShell
 
