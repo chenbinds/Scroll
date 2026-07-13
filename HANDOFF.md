@@ -1,6 +1,7 @@
 # Handoff — 卷轴 Scroll
 
-> 最新标注交接：`Information/Handoff_标注_2026-07-13.md`  
+> 最新交接：`Information/Handoff_新窗口继续_2026-07-13.md`  
+> 标注细节：`Information/Handoff_标注_2026-07-13.md`  
 > 待办清单：`TODO.md`  
 > 历史文档：`Information/archive/`
 
