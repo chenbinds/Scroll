@@ -20,6 +20,9 @@
 | 构建 | `rebuild.bat` | 只构建到 `out/` |
 | 打包 | `build.bat` | 构建 + 便携 `release/Scroll.exe`（推荐日常） |
 | 开发 | `start.bat` | electron-vite dev，调试用 |
+| 首次安装 | `install.bat` | `npm install`（仅新机/清依赖后） |
+
+**已废弃（勿用）：** `install_calibre.bat` / `setup_calibre.bat` / `copy_calibre.bat` — MOBI 已改 foliate-js，禁止捆绑 Calibre。
 
 ## 目录结构
 
@@ -117,4 +120,4 @@ MOBI/AZW3 → foliate-js (mobi.js) → MobiReader 全量渲染
 ## PowerShell
 
 用 `;` 连接命令，不用 `&&`。
-
+

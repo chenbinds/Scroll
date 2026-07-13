@@ -162,7 +162,7 @@
 - 阅读工具栏去掉书名；「返回书架」改为醒目按钮
 
 ### 工程整理
-- 清理 vite 临时配置、boot 日志、豆瓣临时脚本、`copy_calibre.bat`、旧 `info/` 调研
+- 清理 vite 临时配置、boot 日志、豆瓣临时脚本、`copy_calibre.bat`、`install_calibre.bat`、`setup_calibre.bat`、`make.bat`（与 `build.bat` 重复）、旧 `info/` 调研
 - Handoff 归档至 `Information/archive/`；现行 `Information/Handoff_标注_2026-07-13.md`
 - 新增根目录 `TODO.md`（音乐 / AI / 标注后续 / DJVU 等）
 - 更新 `HANDOFF.md`、`CLAUDE.md`、`.gitignore`

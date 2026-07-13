@@ -18,6 +18,9 @@ EPUB / TXT / PDF / CBZ / MOBI(AZW3) 阅读器可用。
 | 构建 | `rebuild.bat` 或 `npx electron-vite build` |
 | 打包 | `build.bat` → `release/Scroll.exe`（启动更快，推荐） |
 | 开发 | `start.bat`（慢，调试用） |
+| 首次安装 | `install.bat`（仅新机） |
+
+**勿用：** 任何 `*calibre*.bat`（已删除；MOBI 走 foliate-js）。
 
 ## 关键文件
 
