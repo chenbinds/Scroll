@@ -37,13 +37,14 @@ class JsonStore {
     }
   }
 
-  set<T = unknown>(key: string, value: T): void {
+  set(key: string, value: unknown): void {
     const filePath = this.getFilePath(key)
     const dir = dirname(filePath)
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true })
     }
-    writeFileSync(filePath, JSON.stringify(value, null, 2), 'utf-8')
+    // Compact JSON — covers as data URLs make pretty-print very expensive
+    writeFileSync(filePath, JSON.stringify(value), 'utf-8')
   }
 
   delete(key: string): void {

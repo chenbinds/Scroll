@@ -1,37 +1,52 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
+import { readFileSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import {
+  registerCoverSchemePrivileged,
+  registerCoverProtocol,
+  saveCoverFromDataUrl,
+  migrateInlineCovers,
+  coverUrlFor
+} from './covers'
+import { bookStore, settingsStore, musicStore } from './storage'
+
+const bootStarted = Date.now()
+
+// Custom protocol must be registered before ready
+registerCoverSchemePrivileged()
 
 let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
+  console.log(`[scroll] createWindow +${Date.now() - bootStarted}ms`)
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 800,
     minHeight: 600,
-    show: false,
-    title: 'Scroll',
+    // Show immediately with HTML splash — don't wait for React
+    show: true,
+    title: '卷轴 Scroll',
     autoHideMenuBar: true,
-    backgroundColor: '#ffffff', // MUST be opaque — enables ClearType sub-pixel AA on Windows
+    backgroundColor: '#f8fafc',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
-      webSecurity: true
+      webSecurity: true,
+      backgroundThrottling: false
     }
   })
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow!.show()
+  mainWindow.webContents.on('did-finish-load', () => {
+    console.log(`[scroll] did-finish-load +${Date.now() - bootStarted}ms`)
   })
 
-  // 在外部浏览器打开链接
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
 
-  // 开发：加载 vite dev server；生产：加载打包后的文件
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -68,7 +83,6 @@ ipcMain.handle('dialog:openBook', async () => {
 })
 
 // 读取文件内容（用于 PDF/EPUB 等需要在渲染进程处理的格式）
-import { readFileSync } from 'fs'
 ipcMain.handle('file:read', async (_event, filePath: string) => {
   try {
     const buffer = readFileSync(filePath)
@@ -127,34 +141,6 @@ ipcMain.handle('ai:chat', async (_event, { baseUrl, apiKey, model, messages, max
   }
 })
 
-import { execFile } from 'child_process'
-import { existsSync } from 'fs'
-
-// MOBI/AZW3 → EPUB conversion via Calibre's ebook-convert
-ipcMain.handle('mobi:convert', async (_event, filePath: string) => {
-  // Priority: 1) bundled portable, 2) system install, 3) PATH
-  const candidates = [
-    join(__dirname, '../../tools/calibre-portable/Calibre/ebook-convert.exe'),
-    'C:/Program Files/Calibre2/ebook-convert.exe',
-    'C:/Program Files (x86)/Calibre2/ebook-convert.exe',
-    'ebook-convert',
-  ]
-  let converter = ''
-  for (const c of candidates) {
-    if (existsSync(c)) { converter = c; break }
-  }
-  if (!converter) return null
-
-  return new Promise((resolve) => {
-    const epubPath = filePath.replace(/\.\w+$/, '_conv.epub')
-    if (existsSync(epubPath)) { resolve(epubPath); return }
-    execFile(converter, [filePath, epubPath], { timeout: 120000 }, (err) => {
-      if (err || !existsSync(epubPath)) { resolve(null); return }
-      resolve(epubPath)
-    })
-  })
-})
-
 // Read file by local path (for cover extraction etc.)
 ipcMain.handle('file:readPath', async (_event, filePath: string) => {
   try {
@@ -162,6 +148,14 @@ ipcMain.handle('file:readPath', async (_event, filePath: string) => {
     return buf.toString('base64')
   } catch { return null }
 })
+
+// Save cover thumbnail to disk; returns scroll-cover:// URL (keeps books JSON tiny)
+ipcMain.handle('covers:save', async (_event, bookId: string, dataUrl: string) => {
+  if (!bookId || !dataUrl) return null
+  return saveCoverFromDataUrl(bookId, dataUrl)
+})
+
+ipcMain.handle('covers:url', (_event, bookId: string) => coverUrlFor(bookId))
 
 // Douban search proxy — uses Node.js https (reliable, bypasses Electron net.fetch issues)
 ipcMain.handle('douban:search', async (_event, title: string, author?: string) => {
@@ -207,12 +201,39 @@ ipcMain.handle('douban:search', async (_event, title: string, author?: string) =
   } catch { return null }
 })
 
-// 存储：读取
+// One-shot bootstrap — avoids N sequential storage IPC round-trips on startup
+ipcMain.handle('app:bootstrap', async () => {
+  const t0 = Date.now()
+  let books = bookStore.get('books', []) as unknown
+  if (Array.isArray(books)) {
+    const migrated = migrateInlineCovers(books as { id: string; coverUrl?: string }[])
+    if (migrated.changed) {
+      bookStore.set('books', migrated.books)
+      books = migrated.books
+    }
+  }
+  const payload = {
+    books: Array.isArray(books) ? books : [],
+    bookmarks: settingsStore.get('bookmarks', []),
+    darkMode: settingsStore.get('darkMode', true),
+    readingTheme: settingsStore.get('readingTheme', 'light'),
+    readingFont: settingsStore.get('readingFont', 'system'),
+    aiConfig: settingsStore.get('aiConfig', null)
+  }
+  console.log(`[scroll] bootstrap +${Date.now() - bootStarted}ms (handler ${Date.now() - t0}ms)`)
+  return payload
+})
+
+// 存储：读取（书架启动时顺便把内嵌封面迁到磁盘，避免 IPC 传几百 KB）
 ipcMain.handle('storage:get', async (_event, key: string, defaultValue: unknown) => {
-  const { bookStore, settingsStore, musicStore } = await import('./storage')
-  // 根据 key 前缀选择对应的 store
   if (key.startsWith('books') || key.startsWith('book_')) {
-    return bookStore.get(key, defaultValue)
+    const value = bookStore.get(key, defaultValue)
+    if (key === 'books' && Array.isArray(value)) {
+      const { books, changed } = migrateInlineCovers(value as { id: string; coverUrl?: string }[])
+      if (changed) bookStore.set(key, books)
+      return books
+    }
+    return value
   } else if (key.startsWith('settings') || key.startsWith('ai_')) {
     return settingsStore.get(key, defaultValue)
   } else if (key.startsWith('music')) {
@@ -223,7 +244,6 @@ ipcMain.handle('storage:get', async (_event, key: string, defaultValue: unknown)
 
 // 存储：写入
 ipcMain.handle('storage:set', async (_event, key: string, value: unknown) => {
-  const { bookStore, settingsStore, musicStore } = await import('./storage')
   if (key.startsWith('books') || key.startsWith('book_')) {
     bookStore.set(key, value)
   } else if (key.startsWith('settings') || key.startsWith('ai_')) {
@@ -238,7 +258,9 @@ ipcMain.handle('storage:set', async (_event, key: string, value: unknown) => {
 
 // 应用就绪
 app.whenReady().then(() => {
+  console.log(`[scroll] whenReady +${Date.now() - bootStarted}ms`)
   electronApp.setAppUserModelId('com.scroll.ebook-reader')
+  registerCoverProtocol()
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

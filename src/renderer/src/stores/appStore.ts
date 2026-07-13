@@ -60,6 +60,7 @@ interface AppState {
   leftSidebarOpen: boolean
   leftSidebarTab: 'toc' | 'bookmarks'
   toggleLeftSidebar: (tab: 'toc' | 'bookmarks') => void
+  setLeftSidebarTab: (tab: 'toc' | 'bookmarks') => void
   // Right sidebar (AI)
   rightSidebarOpen: boolean
   toggleRightSidebar: () => void
@@ -146,6 +147,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     leftSidebarTab: tab,
     leftSidebarOpen: s.leftSidebarTab === tab ? !s.leftSidebarOpen : true
   })),
+  setLeftSidebarTab: (tab) => set({ leftSidebarTab: tab }),
   rightSidebarOpen: false,
   toggleRightSidebar: () => set((s) => ({ rightSidebarOpen: !s.rightSidebarOpen })),
 

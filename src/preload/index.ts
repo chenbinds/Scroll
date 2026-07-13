@@ -1,39 +1,31 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-// 暴露给渲染进程的安全 API
 contextBridge.exposeInMainWorld('scrollAPI', {
-  // 文件操作
   openBookDialog: () => ipcRenderer.invoke('dialog:openBook'),
   openMusicDialog: () => ipcRenderer.invoke('dialog:openMusic'),
   readFile: (filePath: string) => ipcRenderer.invoke('file:read', filePath),
   readPath: (filePath: string) => ipcRenderer.invoke('file:readPath', filePath),
 
-  // 窗口控制
   getDataPath: () => ipcRenderer.invoke('app:getDataPath'),
   setBackgroundColor: (color: string) => ipcRenderer.invoke('window:setBackgroundColor', color),
+  bootstrap: () => ipcRenderer.invoke('app:bootstrap'),
 
-  // AI 聊天 (OpenAI 兼容协议)
   aiChat: (params: AiChatParams) => ipcRenderer.invoke('ai:chat', params),
 
-  // 数据库操作（后续扩展）
-  db: {
-    // 占位 — 后续通过 IPC 调用 better-sqlite3
-  },
+  db: {},
 
-  // MOBI → EPUB conversion (via Calibre ebook-convert)
-  convertMobi: (filePath: string) => ipcRenderer.invoke('mobi:convert', filePath),
-
-  // Douban book search
   doubanSearch: (title: string, author?: string) => ipcRenderer.invoke('douban:search', title, author),
 
-  // 存储（JSON 文件持久化）
+  /** Persist cover thumbnail to disk; returns scroll-cover:// URL */
+  saveCover: (bookId: string, dataUrl: string) =>
+    ipcRenderer.invoke('covers:save', bookId, dataUrl) as Promise<string | null>,
+
   storage: {
     get: (key: string, defaultValue: unknown) => ipcRenderer.invoke('storage:get', key, defaultValue),
     set: (key: string, value: unknown) => ipcRenderer.invoke('storage:set', key, value)
   }
 })
 
-// 类型定义
 export interface AiChatParams {
   baseUrl: string
   apiKey: string
@@ -43,14 +35,23 @@ export interface AiChatParams {
 }
 
 export interface ScrollAPI {
-  convertMobi: (filePath: string) => Promise<string | null>
   doubanSearch: (title: string, author?: string) => Promise<any>
   openBookDialog: () => Promise<string[] | null>
   openMusicDialog: () => Promise<string[] | null>
   readFile: (filePath: string) => Promise<string>
+  readPath: (filePath: string) => Promise<string | null>
   getDataPath: () => Promise<string>
   setBackgroundColor: (color: string) => Promise<void>
+  bootstrap: () => Promise<{
+    books: unknown[]
+    bookmarks: unknown
+    darkMode: unknown
+    readingTheme: unknown
+    readingFont: unknown
+    aiConfig: unknown
+  }>
   aiChat: (params: AiChatParams) => Promise<any>
+  saveCover: (bookId: string, dataUrl: string) => Promise<string | null>
   db: Record<string, never>
   storage: {
     get: (key: string, defaultValue: unknown) => Promise<unknown>

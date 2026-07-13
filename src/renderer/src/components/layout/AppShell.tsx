@@ -1,9 +1,10 @@
-import { type ReactNode } from 'react'
+import { type ReactNode, lazy, Suspense, useEffect, useState } from 'react'
 import { useAppStore } from '../../stores/appStore'
 import TopBar from './TopBar'
-import LeftSidebar from './LeftSidebar'
-import RightSidebar from './RightSidebar'
-import MusicPlayer from '../music/MusicPlayer'
+
+const LeftSidebar = lazy(() => import('./LeftSidebar'))
+const RightSidebar = lazy(() => import('./RightSidebar'))
+const MusicPlayer = lazy(() => import('../music/MusicPlayer'))
 
 interface Props {
   children: ReactNode
@@ -12,23 +13,38 @@ interface Props {
 
 export default function AppShell({ children, onOpenSettings }: Props) {
   const { leftSidebarOpen, rightSidebarOpen, currentView } = useAppStore()
+  const [musicReady, setMusicReady] = useState(false)
+
+  // Defer music player until after first paint / idle
+  useEffect(() => {
+    const ric = (window as any).requestIdleCallback as undefined | ((cb: () => void, opts?: { timeout: number }) => number)
+    if (ric) {
+      const id = ric(() => setMusicReady(true), { timeout: 1500 })
+      return () => (window as any).cancelIdleCallback?.(id)
+    }
+    const t = window.setTimeout(() => setMusicReady(true), 400)
+    return () => clearTimeout(t)
+  }, [])
 
   return (
-    <div className="h-screen flex flex-col bg-white dark:bg-gray-950 transition-colors">
+    <div className="h-screen flex flex-col bg-slate-50 dark:bg-gray-950 transition-colors">
       <TopBar onOpenSettings={onOpenSettings} />
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Left sidebar: TOC + Bookmarks */}
-        {currentView === 'reader' && leftSidebarOpen && <LeftSidebar />}
-
-        {/* Main content */}
+        {currentView === 'reader' && leftSidebarOpen && (
+          <Suspense fallback={null}><LeftSidebar /></Suspense>
+        )}
         <main className="flex-1 overflow-hidden">{children}</main>
-
-        {/* Right sidebar: AI */}
-        {currentView === 'reader' && rightSidebarOpen && <RightSidebar />}
+        {currentView === 'reader' && rightSidebarOpen && (
+          <Suspense fallback={null}><RightSidebar /></Suspense>
+        )}
       </div>
 
-      <MusicPlayer />
+      {musicReady && (
+        <Suspense fallback={null}>
+          <MusicPlayer />
+        </Suspense>
+      )}
     </div>
   )
 }

@@ -1,42 +1,42 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import AppShell from './components/layout/AppShell'
 import LibraryView from './components/library/LibraryView'
-import ReaderView from './components/reader/ReaderView'
-import PdfReader from './components/reader/PdfReader'
-import EpubReader from './components/reader/EpubReader'
-import TxtReader from './components/reader/TxtReader'
-import MobiReader from './components/reader/MobiReader'
-import ComicReader from './components/reader/ComicReader'
-import type { TocItem } from './components/reader/EpubReader'
-import SettingsDialog from './components/layout/SettingsDialog'
 import { useAppStore } from './stores/appStore'
 import { getThemeStyle } from './lib/readingTheme'
+import { cleanBookTitle } from './lib/bookTitle'
+
+const PdfReader = lazy(() => import('./components/reader/PdfReader'))
+const EpubReader = lazy(() => import('./components/reader/EpubReader'))
+const TxtReader = lazy(() => import('./components/reader/TxtReader'))
+const MobiReader = lazy(() => import('./components/reader/MobiReader'))
+const ComicReader = lazy(() => import('./components/reader/ComicReader'))
+const ReaderView = lazy(() => import('./components/reader/ReaderView'))
+const SettingsDialog = lazy(() => import('./components/layout/SettingsDialog'))
 
 const TOC_FORMATS = new Set(['EPUB', 'TXT', 'MD', 'MARKDOWN', 'MOBI', 'AZW', 'AZW3'])
+
+function ReaderFallback() {
+  return (
+    <div className="h-full flex items-center justify-center">
+      <div className="flex gap-1.5">
+        <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+        <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+        <span className="w-2.5 h-2.5 bg-scroll-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+      </div>
+    </div>
+  )
+}
 
 export default function App() {
   const { currentView, currentBook, darkMode, setCurrentView, updateBookProgress } = useAppStore()
   const [showSettings, setShowSettings] = useState(false)
-  const [convertedEpubPath, setConvertedEpubPath] = useState<string | null>(null)
-
-  // Try Calibre conversion for MOBI/AZW3
-  useEffect(() => {
-    setConvertedEpubPath(null) // clear old book's epub immediately
-    if (!currentBook) return
-    const fmt = currentBook.format.toUpperCase()
-    if (fmt === 'MOBI' || fmt === 'AZW' || fmt === 'AZW3') {
-      window.scrollAPI.convertMobi(currentBook.path).then((epubPath: string | null) => {
-        if (epubPath) setConvertedEpubPath(epubPath)
-      }).catch(() => {})
-    }
-  }, [currentBook])
+  const [libraryReady, setLibraryReady] = useState(false)
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode)
-    window.scrollAPI.setBackgroundColor(darkMode ? '#111827' : '#ffffff').catch(() => {})
+    window.scrollAPI.setBackgroundColor(darkMode ? '#111827' : '#f8fafc').catch(() => {})
   }, [darkMode])
 
-  // Apply reading theme as CSS custom properties
   const readingTheme = useAppStore((s) => s.readingTheme)
   const readingFont = useAppStore((s) => s.readingFont)
   useEffect(() => {
@@ -48,69 +48,74 @@ export default function App() {
     else root.style.removeProperty('--reader-font')
   }, [readingTheme, readingFont])
 
-  // Load library from storage
+  // Single bootstrap IPC — all startup state at once
   useEffect(() => {
-    window.scrollAPI.storage.get('books', []).then((saved: unknown) => {
-      if (Array.isArray(saved) && saved.length > 0) useAppStore.getState().setBooks(saved)
-    }).catch(() => {})
+    const t0 = performance.now()
+    let cancelled = false
+    window.scrollAPI.bootstrap().then((data) => {
+      if (cancelled) return
+      const st = useAppStore.getState()
+      if (Array.isArray(data.books) && data.books.length > 0) {
+        st.setBooks(
+          data.books.map((b: any) => ({
+            ...b,
+            title: typeof b.title === 'string' ? cleanBookTitle(b.title) : b.title
+          }))
+        )
+      }
+      if (Array.isArray(data.bookmarks)) st.setBookmarks(data.bookmarks as any)
+      if (typeof data.darkMode === 'boolean') st.setDarkMode(data.darkMode)
+      if (typeof data.readingTheme === 'string') st.setReadingTheme(data.readingTheme as any)
+      if (typeof data.readingFont === 'string') st.setReadingFont(data.readingFont as any)
+      if (data.aiConfig) st.setAiConfig(data.aiConfig as any)
+      setLibraryReady(true)
+      console.log(`[scroll] renderer bootstrap done in ${(performance.now() - t0).toFixed(0)}ms`)
+    }).catch((err) => {
+      console.error('[scroll] bootstrap failed', err)
+      setLibraryReady(true)
+    })
+    return () => { cancelled = true }
   }, [])
 
-  // Save library
   const { books } = useAppStore()
   useEffect(() => {
-    if (books.length > 0) window.scrollAPI.storage.set('books', books).catch(() => {})
-  }, [books])
+    if (!libraryReady || books.length === 0) return
+    const timer = setTimeout(() => {
+      window.scrollAPI.storage.set('books', books).catch(() => {})
+    }, 800)
+    return () => clearTimeout(timer)
+  }, [books, libraryReady])
 
-  // Load bookmarks
-  useEffect(() => {
-    window.scrollAPI.storage.get('bookmarks', []).then((saved: unknown) => {
-      if (Array.isArray(saved)) useAppStore.getState().setBookmarks(saved)
-    }).catch(() => {})
-  }, [])
-
-  // Save bookmarks
   const { bookmarks } = useAppStore()
   useEffect(() => {
-    window.scrollAPI.storage.set('bookmarks', bookmarks).catch(() => {})
-  }, [bookmarks])
+    if (!libraryReady) return
+    const timer = setTimeout(() => {
+      window.scrollAPI.storage.set('bookmarks', bookmarks).catch(() => {})
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [bookmarks, libraryReady])
 
-  // Save AI config
   const { aiConfig } = useAppStore()
   useEffect(() => {
+    if (!libraryReady) return
     if (aiConfig.apiKey) window.scrollAPI.storage.set('aiConfig', aiConfig).catch(() => {})
-  }, [aiConfig])
+  }, [aiConfig, libraryReady])
 
-  // Persist darkMode
   useEffect(() => {
-    window.scrollAPI.storage.get('darkMode', true).then((saved: unknown) => {
-      if (typeof saved === 'boolean') useAppStore.getState().setDarkMode(saved)
-    }).catch(() => {})
-  }, [])
-  useEffect(() => {
+    if (!libraryReady) return
     window.scrollAPI.storage.set('darkMode', darkMode).catch(() => {})
-  }, [darkMode])
+  }, [darkMode, libraryReady])
 
-  // Persist readingTheme
   useEffect(() => {
-    window.scrollAPI.storage.get('readingTheme', 'light').then((saved: unknown) => {
-      if (typeof saved === 'string') useAppStore.getState().setReadingTheme(saved as any)
-    }).catch(() => {})
-  }, [])
-  useEffect(() => {
+    if (!libraryReady) return
     window.scrollAPI.storage.set('readingTheme', readingTheme).catch(() => {})
-  }, [readingTheme])
+  }, [readingTheme, libraryReady])
+
   useEffect(() => {
+    if (!libraryReady) return
     window.scrollAPI.storage.set('readingFont', readingFont).catch(() => {})
-  }, [readingFont])
+  }, [readingFont, libraryReady])
 
-  // Load AI config
-  useEffect(() => {
-    window.scrollAPI.storage.get('aiConfig', null).then((saved: unknown) => {
-      if (saved) useAppStore.getState().setAiConfig(saved as Partial<import('./stores/appStore').AiConfig>)
-    }).catch(() => {})
-  }, [])
-
-  // Auto-close left sidebar for formats without TOC
   useEffect(() => {
     if (!currentBook) return
     const format = currentBook.format.toUpperCase()
@@ -120,7 +125,6 @@ export default function App() {
     }
   }, [currentBook])
 
-  // Back to library: clear TOC
   useEffect(() => {
     if (currentView === 'library') {
       useAppStore.getState().setToc([])
@@ -165,7 +169,7 @@ export default function App() {
             updateBookProgress(currentBook.id, progress, chapterIndex)
             useAppStore.getState().setReadingPosition({ chapter: String(chapterIndex), page: chapterIndex, percent: progress })
           }}
-          onTocReady={(toc: TocItem[]) => { useAppStore.getState().setToc(toc) }} />
+          onTocReady={(toc) => { useAppStore.getState().setToc(toc) }} />
 
       case 'TXT':
       case 'MD':
@@ -180,24 +184,13 @@ export default function App() {
       case 'MOBI':
       case 'AZW':
       case 'AZW3':
-        // Use Calibre-converted EPUB when available
-        if (convertedEpubPath) {
-          return <EpubReader filePath={convertedEpubPath} onClose={() => setCurrentView('library')}
-            initialChapterIndex={currentBook.currentPage || 0}
-            initialProgress={currentBook.progress || undefined}
-            onProgress={(chapterIndex: number, _count: number, progress: number) => {
-              updateBookProgress(currentBook.id, progress, chapterIndex)
-              useAppStore.getState().setReadingPosition({ chapter: String(chapterIndex), page: chapterIndex, percent: progress })
-            }}
-            onTocReady={(toc: any) => { useAppStore.getState().setToc(toc) }} />
-        }
         return <MobiReader filePath={currentBook.path} onClose={() => setCurrentView('library')}
           initialProgress={currentBook.progress || undefined}
           onProgress={(chapterIndex, _count, progress) => {
             updateBookProgress(currentBook.id, progress, chapterIndex)
             useAppStore.getState().setReadingPosition({ chapter: String(chapterIndex), page: chapterIndex, percent: progress })
           }}
-          onTocReady={(toc: any) => { useAppStore.getState().setToc(toc) }}
+          onTocReady={(toc) => { useAppStore.getState().setToc(toc) }}
           />
 
       case 'CBZ':
@@ -218,9 +211,14 @@ export default function App() {
 
   return (
     <AppShell onOpenSettings={() => setShowSettings(true)}>
-      {currentView === 'library' && <LibraryView />}
-      {currentView === 'reader' && renderReader()}
-      {showSettings && <SettingsDialog onClose={() => setShowSettings(false)} />}
+      {currentView === 'library' ? <LibraryView /> : (
+        <Suspense fallback={<ReaderFallback />}>{renderReader()}</Suspense>
+      )}
+      {showSettings && (
+        <Suspense fallback={null}>
+          <SettingsDialog onClose={() => setShowSettings(false)} />
+        </Suspense>
+      )}
     </AppShell>
   )
 }

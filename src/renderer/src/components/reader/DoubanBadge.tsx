@@ -1,37 +1,53 @@
-import { useState, useEffect } from 'react'
-import { Star, ExternalLink } from 'lucide-react'
+import { Star, RefreshCw } from 'lucide-react'
+import { useState } from 'react'
 
-interface Props { title: string; author?: string }
+interface Props {
+  rating?: number | null
+  title: string
+  author?: string
+  onRefresh?: () => void | Promise<void>
+}
 
-interface DoubanInfo { rating: number; url: string; pub?: string }
+/** Shows stored Douban rating; refresh only when user clicks. */
+export default function DoubanBadge({ rating, title, author, onRefresh }: Props) {
+  const [busy, setBusy] = useState(false)
+  const hasRating = rating != null && rating > 0
 
-export default function DoubanBadge({ title, author }: Props) {
-  const [info, setInfo] = useState<DoubanInfo | null>(null)
-  const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    setLoading(true)
-    window.scrollAPI.doubanSearch(title, author).then((result) => {
-      if (result) setInfo(result)
-    }).catch(() => {}).finally(() => setLoading(false))
-  }, [title, author])
-
-  if (loading && !info) {
-    return <span className="text-[10px] text-gray-400 animate-pulse">豆瓣...</span>
+  const handleRefresh = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    if (!onRefresh || busy) return
+    setBusy(true)
+    try {
+      await onRefresh()
+    } finally {
+      setBusy(false)
+    }
   }
-  if (!info) return null
+
+  if (!hasRating && !onRefresh) return null
 
   return (
-    <a
-      href={info.url}
-      title={info.pub ? `出版: ${info.pub}` : '在豆瓣查看'}
-      onClick={(e) => { e.stopPropagation() }}
-      className="flex items-center gap-1 text-[11px] no-underline
-                 text-yellow-600 dark:text-yellow-500 hover:opacity-80 transition-opacity flex-shrink-0"
-    >
-      <Star size={12} fill="currentColor" />
-      <span className="font-medium">{info.rating.toFixed(1)}</span>
-      <ExternalLink size={10} className="opacity-50" />
-    </a>
+    <span className="flex items-center gap-1 text-[11px] text-yellow-600 dark:text-yellow-500 flex-shrink-0">
+      {hasRating ? (
+        <>
+          <Star size={12} fill="currentColor" />
+          <span className="font-medium">{rating!.toFixed(1)}</span>
+        </>
+      ) : (
+        <span className="text-gray-400">豆瓣</span>
+      )}
+      {onRefresh && (
+        <button
+          type="button"
+          onClick={handleRefresh}
+          disabled={busy}
+          title={`更新豆瓣评分：${title}${author ? ' / ' + author : ''}`}
+          className="p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+        >
+          {busy ? <RefreshCw size={10} className="animate-spin" /> : <RefreshCw size={10} className="opacity-50" />}
+        </button>
+      )}
+    </span>
   )
 }

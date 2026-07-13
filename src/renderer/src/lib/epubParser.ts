@@ -5,6 +5,7 @@
  */
 
 import JSZip from 'jszip'
+import { compressCoverDataUrl } from './coverImage'
 
 export interface EpubMetadata {
   title: string
@@ -59,7 +60,7 @@ export async function extractEpubCover(base64Data: string): Promise<string | und
     const ext = coverPath.split('.').pop()?.toLowerCase() || 'jpg'
     const mime = ext === 'jpg' ? 'jpeg' : ext === 'svg' ? 'svg+xml' : ext
     const b64 = await coverFile.async('base64')
-    return `data:image/${mime};base64,${b64}`
+    return compressCoverDataUrl(`data:image/${mime};base64,${b64}`)
   } catch { return undefined }
 }
 

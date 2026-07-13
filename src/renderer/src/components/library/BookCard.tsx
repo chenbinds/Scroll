@@ -1,5 +1,7 @@
-import { X, Star } from 'lucide-react'
+import { useState } from 'react'
+import { X, Star, RefreshCw } from 'lucide-react'
 import type { Book } from '../../stores/appStore'
+import { useI18n } from '../../lib/i18n'
 
 const FORMAT_COLORS: Record<string, string> = {
   PDF: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
@@ -15,21 +17,35 @@ interface Props {
   book: Book
   onClick: () => void
   onDelete: () => void
+  onRefreshRating?: () => void | Promise<void>
 }
 
-export default function BookCard({ book, onClick, onDelete }: Props) {
+export default function BookCard({ book, onClick, onDelete, onRefreshRating }: Props) {
+  const { t } = useI18n()
+  const [ratingBusy, setRatingBusy] = useState(false)
   const formatClass = FORMAT_COLORS[book.format] || 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+  const hasRating = book.doubanRating != null && book.doubanRating > 0
+
+  const handleRefreshRating = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!onRefreshRating || ratingBusy) return
+    setRatingBusy(true)
+    try {
+      await onRefreshRating()
+    } finally {
+      setRatingBusy(false)
+    }
+  }
 
   return (
     <div className="group relative">
-      {/* Delete button — visible on hover */}
       <button
         onClick={(e) => { e.stopPropagation(); onDelete() }}
         className="absolute -top-1.5 -right-1.5 z-10 p-0.5 rounded-full
                    bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700
                    text-gray-400 hover:text-red-500 hover:border-red-300
                    opacity-0 group-hover:opacity-100 transition-all shadow-sm"
-        title="Remove from library"
+        title={t('library.remove')}
       >
         <X size={14} />
       </button>
@@ -41,12 +57,18 @@ export default function BookCard({ book, onClick, onDelete }: Props) {
                    hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-900
                    overflow-hidden h-full"
       >
-        {/* Cover */}
         <div className="aspect-[3/4] bg-gradient-to-br from-gray-100 to-gray-200
                         dark:from-gray-800 dark:to-gray-700
                         flex items-center justify-center relative overflow-hidden">
           {book.coverUrl ? (
-            <img src={book.coverUrl} alt={book.title} className="w-full h-full object-cover" />
+            <img
+              src={book.coverUrl}
+              alt=""
+              loading="eager"
+              decoding="async"
+              fetchPriority="low"
+              className="w-full h-full object-cover"
+            />
           ) : (
             <div className="text-center p-4">
               <div className="text-3xl font-bold text-gray-300 dark:text-gray-600 mb-2">
@@ -62,16 +84,26 @@ export default function BookCard({ book, onClick, onDelete }: Props) {
             {book.format}
           </span>
 
-          {/* Douban rating badge — bottom left */}
-          {book.doubanRating != null && (
-            <div className="absolute bottom-6 left-1.5 flex items-center gap-0.5 bg-black/60 text-yellow-400
-                            text-[11px] font-medium px-1.5 py-0.5 rounded">
-              <Star size={11} fill="currentColor" />
-              {book.doubanRating.toFixed(1)}
-            </div>
-          )}
+          {/* Rating badge — click to refresh manually */}
+          <button
+            type="button"
+            onClick={handleRefreshRating}
+            disabled={ratingBusy}
+            title={t('library.refreshRating')}
+            className={`absolute bottom-6 left-1.5 flex items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded
+                        transition-opacity z-[1]
+                        ${hasRating
+                          ? 'bg-black/60 text-yellow-400'
+                          : 'bg-black/40 text-gray-200 opacity-0 group-hover:opacity-100'}`}
+          >
+            {ratingBusy ? (
+              <RefreshCw size={11} className="animate-spin" />
+            ) : (
+              <Star size={11} fill={hasRating ? 'currentColor' : 'none'} />
+            )}
+            {hasRating ? book.doubanRating!.toFixed(1) : t('library.fetchRating')}
+          </button>
 
-          {/* Progress bar — always visible */}
           <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-200 dark:bg-gray-700">
             <div
               className={`h-full transition-all ${book.progress >= 100 ? 'bg-green-500' : 'bg-scroll-500'}`}
@@ -80,7 +112,6 @@ export default function BookCard({ book, onClick, onDelete }: Props) {
           </div>
         </div>
 
-        {/* Info */}
         <div className="p-3">
           <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
             {book.title}

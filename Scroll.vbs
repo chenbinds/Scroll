@@ -9,9 +9,8 @@ If Not fso.FileExists(exe) Then
     WScript.Quit 1
 End If
 If Not fso.FileExists(app) Then
-    MsgBox "App not built. Run make.bat first.", 48, "Scroll"
+    MsgBox "App not built. Run rebuild.bat first.", 48, "Scroll"
     WScript.Quit 1
 End If
-cmd = "cmd /c cd /d """ & root & """ && """ & exe & """ """ & app & """"
-shell.Run cmd, 0, False
-
+' Launch Electron directly (no cmd.exe wrapper — faster startup)
+shell.Run """" & exe & """ """ & app & """", 1, False

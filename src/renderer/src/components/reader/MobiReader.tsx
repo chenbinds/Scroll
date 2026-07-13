@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import { parseMobi, type MobiChapter } from '../../lib/mobiParser'
+import { cleanBookTitle } from '../../lib/bookTitle'
 import { useAppStore } from '../../stores/appStore'
 import ReaderThemeBar from './ReaderThemeBar'
 import { useI18n } from '../../lib/i18n'
@@ -35,9 +36,10 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
     return () => { useAppStore.getState().setToc([]) }
   }, [])
 
-  // Load MOBI
+  // Load MOBI/AZW3 via foliate-js
   useEffect(() => {
     let cancelled = false
+    let destroyBook: (() => void) | undefined
     setLoading(true)
     setError(null)
     hasRestoredRef.current = false
@@ -48,11 +50,42 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
         if (cancelled) return
 
         const content = await parseMobi(base64)
-        if (cancelled) return
+        if (cancelled) {
+          content.destroy()
+          return
+        }
+        destroyBook = content.destroy
 
-        setTitle(content.metadata.title)
-        setAuthor(content.metadata.author)
+        const displayTitle = cleanBookTitle(content.metadata.title)
+        const displayAuthor = content.metadata.author
+
+        setTitle(displayTitle)
+        setAuthor(displayAuthor)
         setChapters(content.chapters)
+
+        // Sync cleaned metadata + cover into library / top bar / TOC header
+        {
+          const st = useAppStore.getState()
+          const book = st.currentBook
+          if (book) {
+            const patch: Partial<typeof book> = {}
+            if (displayTitle && displayTitle !== book.title) patch.title = displayTitle
+            if (displayAuthor && displayAuthor !== 'Unknown Author' && displayAuthor !== book.author) {
+              patch.author = displayAuthor
+            }
+            if (content.coverUrl && !book.coverUrl) {
+              const ref = await window.scrollAPI.saveCover(book.id, content.coverUrl)
+              if (ref) patch.coverUrl = ref
+            }
+            if (Object.keys(patch).length > 0) {
+              const next = { ...book, ...patch }
+              useAppStore.setState({
+                currentBook: next,
+                books: st.books.map((b) => (b.id === book.id ? next : b))
+              })
+            }
+          }
+        }
 
         // Build TOC
         const toc = content.chapters.map((ch, i) => ({
@@ -75,13 +108,15 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
         if (cancelled) return
         console.error('MOBI load error:', err)
         const msg = err instanceof Error ? (err.stack || err.message) : String(err)
-        console.error('MOBI load error:', msg)
         setError('Failed to load MOBI: ' + msg)
         setLoading(false)
       }
     }
     load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      destroyBook?.()
+    }
   }, [filePath])
 
   // Restore reading position
@@ -121,7 +156,7 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
       const sections = el.querySelectorAll('[data-chapter]')
       const containerRect = el.getBoundingClientRect()
       const viewTop = containerRect.top + containerRect.height * 0.2
-      for (const sec of sections) {
+      for (const sec of Array.from(sections)) {
         const rect = sec.getBoundingClientRect()
         if (rect.top <= viewTop) currentIdx = Number((sec as HTMLElement).dataset.chapter) || 0
         else break

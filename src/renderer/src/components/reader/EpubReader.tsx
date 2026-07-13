@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import { parseEpub, type EpubContent, type TocItem } from '../../lib/epubParser'
+import { cleanBookTitle } from '../../lib/bookTitle'
 import { useAppStore } from '../../stores/appStore'
 import ReaderThemeBar from './ReaderThemeBar'
 import { useI18n } from '../../lib/i18n'
@@ -55,9 +56,33 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
         if (cancelled) return
 
         setEpubContent(content)
-        setTitle(content.metadata.title)
+        const displayTitle = cleanBookTitle(content.metadata.title)
+        setTitle(displayTitle)
         setAuthor(content.metadata.author)
         onTocReady?.(content.toc)
+
+        {
+          const st = useAppStore.getState()
+          const book = st.currentBook
+          if (book) {
+            const patch: Partial<typeof book> = {}
+            if (displayTitle && displayTitle !== book.title) patch.title = displayTitle
+            if (content.metadata.author && content.metadata.author !== 'Unknown Author' && content.metadata.author !== book.author) {
+              patch.author = content.metadata.author
+            }
+            if (content.coverUrl && !book.coverUrl) {
+              const ref = await window.scrollAPI.saveCover(book.id, content.coverUrl)
+              if (ref) patch.coverUrl = ref
+            }
+            if (Object.keys(patch).length > 0) {
+              const next = { ...book, ...patch }
+              useAppStore.setState({
+                currentBook: next,
+                books: st.books.map((b) => (b.id === book.id ? next : b))
+              })
+            }
+          }
+        }
 
         if (content.spine.length > 0) {
           const firstContent = content.files.get(content.spine[0].href)

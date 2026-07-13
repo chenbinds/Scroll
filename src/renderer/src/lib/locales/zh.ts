@@ -17,13 +17,16 @@ const zh = {
   'library.title': '书架',
   'library.import': '导入',
   'library.unknownAuthor': '未知作者',
+  'library.remove': '从书架移除',
+  'library.refreshRating': '手动更新豆瓣评分',
+  'library.fetchRating': '评分',
 
   // Reader
   'reader.placeholder.title': '阅读器引擎开发中',
   'reader.placeholder.desc': '当前为阅读器占位组件。已支持的格式：',
   'reader.placeholder.pdf': 'PDF 渲染 — pdf.js',
   'reader.placeholder.epub': 'EPUB 渲染 — JSZip 自研解析器',
-  'reader.placeholder.mobi': 'MOBI/AZW3 — 自研 PalmDOC 解析器',
+  'reader.placeholder.mobi': 'MOBI/AZW3 — foliate-js 解析',
   'reader.placeholder.txt': 'TXT/Markdown 章节分章',
   'reader.placeholder.cbz': 'CBZ/CBR — 漫画浏览引擎',
   'reader.placeholder.djvu': 'DJVU — 待实现',

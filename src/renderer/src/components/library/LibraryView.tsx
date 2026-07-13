@@ -1,9 +1,29 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback } from 'react'
 import { Book as BookIcon, Plus, FolderOpen } from 'lucide-react'
 import { useAppStore, type Book } from '../../stores/appStore'
 import { useI18n } from '../../lib/i18n'
-import { extractEpubCover } from '../../lib/epubParser'
+import { cleanBookTitle } from '../../lib/bookTitle'
+import { compressCoverDataUrl } from '../../lib/coverImage'
 import BookCard from './BookCard'
+
+function patchBook(id: string, patch: Partial<Book>) {
+  useAppStore.getState().setBooks(
+    useAppStore.getState().books.map((b) => (b.id === id ? { ...b, ...patch } : b))
+  )
+}
+
+async function fetchDoubanRating(book: Pick<Book, 'id' | 'title' | 'author'>, unknownAuthorLabel: string) {
+  const q =
+    book.title.length > 3
+      ? book.title
+      : book.title + ' ' + (book.author !== unknownAuthorLabel && book.author !== 'Unknown Author' ? book.author : '')
+  const info = await window.scrollAPI.doubanSearch(q)
+  if (info?.rating != null) {
+    patchBook(book.id, { doubanRating: info.rating })
+    return info.rating as number
+  }
+  return null
+}
 
 export default function LibraryView() {
   const { t } = useI18n()
@@ -24,7 +44,7 @@ export default function LibraryView() {
 
       const book: Book = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-        title: nameWithoutExt,
+        title: cleanBookTitle(nameWithoutExt),
         author: t('library.unknownAuthor'),
         format: ext.toUpperCase(),
         path,
@@ -37,60 +57,37 @@ export default function LibraryView() {
 
       addBook(book)
 
-      // Fetch Douban rating
-      const searchTitle = book.title.length > 3 ? book.title : book.title + ' ' + (book.author !== 'Unknown Author' ? book.author : '')
-      window.scrollAPI.doubanSearch(searchTitle).then((info: any) => {
-        if (info?.rating) updateBook(book.id, { doubanRating: info.rating })
-      }).catch(() => {})
+      // Douban: fetch once on import only
+      fetchDoubanRating(book, t('library.unknownAuthor')).catch(() => {})
 
-      // Async: extract cover in background (EPUB + MOBI via Calibre)
       const fmt = ext.toUpperCase()
       if (fmt === 'EPUB') {
-        window.scrollAPI.readPath(path).then((base64) => {
-          extractEpubCover(base64).then((coverUrl) => {
-            if (coverUrl) updateBook(book.id, { coverUrl })
-          }).catch(() => {})
+        window.scrollAPI.readPath(path).then(async (base64: string | null) => {
+          if (!base64) return
+          try {
+            const { extractEpubCover } = await import('../../lib/epubParser')
+            const coverUrl = await extractEpubCover(base64)
+            if (coverUrl) patchBook(book.id, { coverUrl: await compressCoverDataUrl(coverUrl) })
+          } catch { /* ignore */ }
         }).catch(() => {})
       } else if (fmt === 'MOBI' || fmt === 'AZW' || fmt === 'AZW3') {
-        // Try Calibre conversion, then extract EPUB cover
-        window.scrollAPI.convertMobi(path).then((epubPath: string | null) => {
-          if (epubPath) {
-            window.scrollAPI.readPath(epubPath).then((base64) => {
-              extractEpubCover(base64).then((coverUrl) => {
-                if (coverUrl) updateBook(book.id, { coverUrl })
-              }).catch(() => {})
-            }).catch(() => {})
-          }
+        window.scrollAPI.readPath(path).then(async (base64: string | null) => {
+          if (!base64) return
+          try {
+            const { extractMobiCover } = await import('../../lib/mobiParser')
+            const coverUrl = await extractMobiCover(base64)
+            if (coverUrl) patchBook(book.id, { coverUrl })
+          } catch { /* ignore */ }
         }).catch(() => {})
-      }
-
-      function updateBook(id: string, patch: Partial<Book>) {
-        useAppStore.getState().setBooks(
-          useAppStore.getState().books.map((b) => b.id === id ? { ...b, ...patch } : b)
-        )
       }
     }
   }, [addBook, t])
 
-  // Fetch Douban ratings for books without one (background, one-by-one)
-  useEffect(() => {
-    const unrated = books.filter((b) => b.doubanRating == null && b.title.length > 2)
-    if (unrated.length === 0) return
-    let i = 0
-    const next = () => {
-      if (i >= unrated.length) return
-      const b = unrated[i++]
-      const q = b.title.length > 4 ? b.title : b.title + ' ' + (b.author !== t('library.unknownAuthor') ? b.author : '')
-      window.scrollAPI.doubanSearch(q).then((info: any) => {
-        if (info?.rating) {
-          useAppStore.getState().setBooks(
-            useAppStore.getState().books.map((x) => x.id === b.id ? { ...x, doubanRating: info.rating } : x)
-          )
-        }
-      }).catch(() => {}).finally(() => setTimeout(next, 2000)) // rate limit
-    }
-    next()
-  }, [books.length])
+  const handleRefreshRating = useCallback(async (book: Book) => {
+    try {
+      await fetchDoubanRating(book, t('library.unknownAuthor'))
+    } catch { /* ignore */ }
+  }, [t])
 
   return (
     <div className="h-full overflow-y-auto scrollbar-thin">
@@ -137,6 +134,7 @@ export default function LibraryView() {
                 book={book}
                 onClick={() => openBook(book)}
                 onDelete={() => removeBook(book.id)}
+                onRefreshRating={() => handleRefreshRating(book)}
               />
             ))}
           </div>

@@ -10,8 +10,8 @@
 - JSZip 自研 EPUB 解析器
 - pdf.js PDF 渲染
 - Web Audio API 音乐生成
-- **MOBI/AZW3：** Calibre `ebook-convert` 转 EPUB（主要路径）→ EpubReader 渲染
-- **MOBI/AZW3 内置解析器：** Koodo Reader 移植（Calibre 不可用时回退）
+- **MOBI/AZW3：** foliate-js（与 Koodo 同源）直接解析 → MobiReader 渲染
+- **MOBI/AZW3 旧方案：** 自研/半移植解析器、Calibre 转换 —— 已废弃
 
 ## 启动方式
 
@@ -21,7 +21,7 @@
 | 生产 | `Scroll.vbs` | 跑 `out/` 构建产物 |
 | 构建 | `rebuild.bat` | 只构建代码（不含打包） |
 | 打包 | `build.bat` | 构建 + 打包 Scroll.exe |
-| 环境 | `setup_calibre.bat` | 下载 Calibre Portable（一次性，~130MB） |
+| 环境 | `setup_calibre.bat` | （已废弃，MOBI 改用 foliate-js，无需 Calibre） |
 
 ## 目录结构
 
@@ -44,7 +44,7 @@ scroll-ebook-reader/
 │           ├── txtParser.ts     # TXT 正则分章
 │           ├── i18n.ts          # 国际化
 │           └── aiService.ts     # AI 聊天
-├── tools/            # Calibre Portable（.gitignore，setup_calibre.bat 下载）
+├── tools/            # （遗留）旧 Calibre Portable 目录，可忽略
 ├── docs/             # 项目文档
 └── out/              # electron-vite 构建产物
 ```
@@ -54,19 +54,11 @@ scroll-ebook-reader/
 ```
 MOBI/AZW3 文件
     │
-    ├── Calibre 可用？
-    │   ├── YES → ebook-convert → EPUB → EpubReader（完美：目录/图片/缩放/编码）
-    │   └── NO  → 内置 MobiReader（基本可用，~90-95% 正确率）
-    │
-    └── 换书时：先清 convertedEpubPath(null)，避免闪现旧书
+    └── foliate-js (mobi.js) → 章节 HTML → MobiReader 全量渲染
+        （PalmDOC / HUFF-CDIC / KF8 均由 foliate-js 处理）
 ```
 
-**Calibre 路径优先级：**
-1. `tools/calibre-portable/Calibre/ebook-convert.exe`（项目内置）
-2. `C:/Program Files/Calibre2/ebook-convert.exe`（系统安装）
-3. `ebook-convert`（PATH）
-
-**分发时** `build.bat` 通过 `electron-builder.yml` 的 `extraResources` 自动把 `tools/` 目录打包进 `Scroll.exe`，实现开箱即用。
+封面：`extractMobiCover()` 从 EXTH coverOffset 提取。
 
 ## 各格式阅读器状态
 
@@ -75,8 +67,7 @@ MOBI/AZW3 文件
 | EPUB | EpubReader | ✅ 稳定 | 全量渲染、树状 TOC、进度恢复 |
 | TXT/MD | TxtReader | ✅ 稳定 | 正则分章 |
 | PDF | PdfReader | ✅ 稳定 | pdf.js canvas，IntersectionObserver 懒渲染 |
-| MOBI/AZW3 | EpubReader | ✅ 完美 | Calibre ebook-convert 转 EPUB |
-| MOBI/AZW3 | MobiReader | ⚠️ 回退 | Calibre 不可用时的内置解析器 |
+| MOBI/AZW3 | MobiReader | ✅ 主路径 | foliate-js（Koodo 同源引擎） |
 | CBZ | ComicReader | ✅ 可用 | JSZip 提取图片 |
 | CBR | ComicReader | ⚠️ 未实测 | RAR 4.x stored 文件 |
 | DJVU | ReaderView | ❌ 未实现 | 占位 |
@@ -94,22 +85,20 @@ MOBI/AZW3 文件
 ### NCX 解析：DOMParser，禁止正则
 - `<navPoint>` 可嵌套，正则处理不了
 
-### MOBI 解析：不要自己造
-- 最大教训：**复杂二进制格式直接用成熟方案（Calibre），不要自己写解析器**
-- PalmDOC、HUFF/CDIC、trailing bytes——每个都是坑
-- Koodo 移植版花费十几次 commit 仍只有 90-95% 正确率
-- Calibre `ebook-convert` 一行命令解决所有问题
+### MOBI 解析：使用 foliate-js，不要自研
+- 与 Koodo Reader 同源（foliate-js / mobi.js）
+- 不要半移植、不要捆绑 Calibre（~200MB）
+- 复杂二进制格式交给成熟库，只做阅读器 UI 与章节渲染
 
-## 已完成功能（2026-07-12）
+## 已完成功能（2026-07-13）
 
 1. ✅ EPUB/TXT/PDF/CBZ 阅读器
-2. ✅ MOBI/AZW3：Calibre `ebook-convert` 转 EPUB（完美）+ 内置解析器回退
+2. ✅ MOBI/AZW3：foliate-js 直接解析（与 Koodo 同源，无需 Calibre）
 3. ✅ 暗色/亮色模式、书签、AI 聊天、音乐播放
 4. ✅ **阅读主题**：5 色背景 + 3 种字体（仅内容区），CSS 变量方案
-5. ✅ **EPUB/MOBI 封面提取**：EPUB 直接提取，MOBI 转 EPUB 后提取，PDF 首页缩略图
+5. ✅ **EPUB/MOBI 封面提取**：EPUB 直接提取，MOBI 经 foliate-js EXTH 提取，PDF 首页缩略图
 6. ✅ **豆瓣评分**：Node.js https 请求 → 解析内嵌 JSON → 书架封面显示 ⭐ 评分
 7. ✅ **角标图片修复**：`max-height: 1.4em` 限制小图尺寸
-8. ✅ Calibre Portable 便携打包方案（`setup_calibre.bat` + `build.bat`）
 
 ## 待实现功能
 
@@ -117,3 +106,4 @@ MOBI/AZW3 文件
 2. DJVU 阅读器
 3. 字体缩放全局持久化（目前每个 reader 独立 fontSize）
 4. CBR 漫画完善（低优先级）
+5. 用真实 MOBI/AZW3 样书回归验证（含原 HUFF/CDIC 问题书）
