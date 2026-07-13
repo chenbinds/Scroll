@@ -1,6 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import {
   registerCoverSchemePrivileged,
@@ -124,6 +124,18 @@ ipcMain.handle('file:read', async (_event, filePath: string) => {
     console.error('File read error:', error)
     throw error
   }
+})
+
+ipcMain.handle('fs:pathExists', async (_event, filePath: string) => {
+  if (typeof filePath !== 'string' || !filePath.trim()) return false
+  return existsSync(filePath)
+})
+
+ipcMain.handle('shell:openExternal', async (_event, url: string) => {
+  if (typeof url !== 'string' || !url.trim()) return false
+  const normalized = url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`
+  await shell.openExternal(normalized)
+  return true
 })
 
 // 打开音乐文件对话框

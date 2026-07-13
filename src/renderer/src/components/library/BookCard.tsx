@@ -30,6 +30,9 @@ export default function BookCard({ book, onClick, onDelete, onRefreshRating, onS
   const [coverBusy, setCoverBusy] = useState(false)
   const [ratingError, setRatingError] = useState<RatingError | null>(null)
   const [coverError, setCoverError] = useState(false)
+  const [manualOpen, setManualOpen] = useState(false)
+  const [manualValue, setManualValue] = useState('')
+  const [manualError, setManualError] = useState<string | null>(null)
   const formatClass = FORMAT_COLORS[book.format] || 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
   const hasRating = book.doubanRating != null && book.doubanRating > 0
 
@@ -47,10 +50,20 @@ export default function BookCard({ book, onClick, onDelete, onRefreshRating, onS
     }
   }
 
+  const openManualDialog = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    if (!onSetManualRating) return
+    setManualValue(hasRating ? String(book.doubanRating) : '')
+    setManualError(null)
+    setManualOpen(true)
+  }
+
   const handleRefreshRating = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (e.shiftKey || e.altKey) {
-      handleManualRating(e)
+    e.preventDefault()
+    if (e.shiftKey || e.altKey || e.ctrlKey || ratingError) {
+      openManualDialog(e)
       return
     }
     if (!onRefreshRating || ratingBusy) return
@@ -68,27 +81,23 @@ export default function BookCard({ book, onClick, onDelete, onRefreshRating, onS
     }
   }
 
-  const handleManualRating = (e: React.MouseEvent) => {
-    e.stopPropagation()
+  const submitManualRating = () => {
     if (!onSetManualRating) return
-    const raw = window.prompt(
-      t('library.manualRatingPrompt'),
-      hasRating ? String(book.doubanRating) : ''
-    )
-    if (raw === null) return
-    const trimmed = raw.trim()
+    const trimmed = manualValue.trim()
     if (!trimmed) {
       onSetManualRating(null)
       setRatingError(null)
+      setManualOpen(false)
       return
     }
     const n = Number(trimmed)
     if (!Number.isFinite(n) || n < 0 || n > 10) {
-      window.alert(t('library.manualRatingInvalid'))
+      setManualError(t('library.manualRatingInvalid'))
       return
     }
     onSetManualRating(Math.round(n * 10) / 10)
     setRatingError(null)
+    setManualOpen(false)
   }
 
   const handleRefreshCover = async (e: React.MouseEvent) => {
@@ -168,11 +177,15 @@ export default function BookCard({ book, onClick, onDelete, onRefreshRating, onS
             type="button"
             onClick={handleRefreshRating}
             disabled={ratingBusy}
-            title={ratingError ? `${errorLabel(ratingError)} · ${t('library.manualRating')}` : `${t('library.refreshRating')} · Shift+${t('library.manualRating')}`}
+            title={
+              ratingError
+                ? t('library.manualRatingHint')
+                : `${t('library.refreshRating')} · ${t('library.manualRatingHint')}`
+            }
             className={`absolute bottom-5 left-1 flex items-center gap-0.5 text-[10px] font-medium px-1 py-0.5 rounded
                         transition-opacity z-[1] max-w-[calc(100%-0.5rem)]
                         ${ratingError
-                          ? 'bg-red-600/85 text-white opacity-100'
+                          ? 'bg-red-600/85 text-white opacity-100 cursor-pointer'
                           : hasRating
                             ? 'bg-black/60 text-yellow-400'
                             : 'bg-black/40 text-gray-200 opacity-0 group-hover:opacity-100'}`}
@@ -184,12 +197,24 @@ export default function BookCard({ book, onClick, onDelete, onRefreshRating, onS
             )}
             <span className="truncate">
               {ratingError
-                ? errorLabel(ratingError)
+                ? t('library.manualRating')
                 : hasRating
                   ? book.doubanRating!.toFixed(1)
                   : t('library.fetchRating')}
             </span>
           </button>
+          {onSetManualRating && !ratingError && (
+            <button
+              type="button"
+              onClick={openManualDialog}
+              title={t('library.manualRatingHint')}
+              className="absolute bottom-5 left-[4.5rem] z-[1] text-[9px] px-1 py-0.5 rounded
+                         bg-black/40 text-gray-200 opacity-0 group-hover:opacity-100
+                         hover:bg-black/60 transition-opacity"
+            >
+              {t('library.manualRatingShort')}
+            </button>
+          )}
 
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-200 dark:bg-gray-700">
             <div
@@ -208,6 +233,66 @@ export default function BookCard({ book, onClick, onDelete, onRefreshRating, onS
           </p>
         </div>
       </div>
+
+      {manualOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40"
+          onClick={(e) => { e.stopPropagation(); setManualOpen(false) }}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700
+                       w-[280px] p-4"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+              {t('library.manualRating')}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">{book.title}</p>
+            {ratingError && (
+              <p className="text-xs text-red-500 mb-2">{errorLabel(ratingError)}</p>
+            )}
+            <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
+              {t('library.manualRatingPrompt')}
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={10}
+              step={0.1}
+              autoFocus
+              value={manualValue}
+              onChange={(e) => { setManualValue(e.target.value); setManualError(null) }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitManualRating()
+                if (e.key === 'Escape') setManualOpen(false)
+              }}
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-700
+                         bg-white dark:bg-gray-800 px-3 py-2 text-sm mb-3
+                         text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-scroll-500/50"
+            />
+            {manualError && (
+              <p className="text-xs text-red-500 mb-2">{manualError}</p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setManualOpen(false)}
+                className="px-3 py-1.5 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={submitManualRating}
+                className="px-3 py-1.5 text-xs bg-scroll-500 hover:bg-scroll-600 text-white rounded-lg"
+              >
+                {t('common.ok')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

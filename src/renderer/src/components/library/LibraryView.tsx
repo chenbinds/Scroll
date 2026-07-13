@@ -1,5 +1,7 @@
 import { useCallback, useMemo } from 'react'
-import { Book as BookIcon, Plus, FolderOpen } from 'lucide-react'
+import { Book as BookIcon, Plus, FolderOpen, ExternalLink } from 'lucide-react'
+
+const ZLIBRARY_URL = 'https://zlib.ch'
 import { useAppStore, type Book } from '../../stores/appStore'
 import { useI18n } from '../../lib/i18n'
 import { cleanBookTitle } from '../../lib/bookTitle'
@@ -100,6 +102,10 @@ export default function LibraryView({ libraryReady }: Props) {
     }
   }, [addBook, t])
 
+  const handleOpenZLibrary = useCallback(() => {
+    void window.scrollAPI.openExternal(ZLIBRARY_URL)
+  }, [])
+
   const handleRefreshRating = useCallback(async (book: Book) => {
     return fetchDoubanRating(book, t('library.unknownAuthor'))
   }, [t])
@@ -175,6 +181,17 @@ export default function LibraryView({ libraryReady }: Props) {
               >
                 <FolderOpen size={16} />
                 {t('library.import')}
+              </button>
+              <button
+                onClick={handleOpenZLibrary}
+                className="px-4 py-2 text-sm rounded-lg flex items-center gap-1.5 transition-colors
+                           border border-gray-300 dark:border-gray-600
+                           text-gray-700 dark:text-gray-300
+                           hover:bg-gray-100 dark:hover:bg-gray-800"
+                title={ZLIBRARY_URL}
+              >
+                <ExternalLink size={16} />
+                {t('library.zlibrary')}
               </button>
             </div>
           </div>

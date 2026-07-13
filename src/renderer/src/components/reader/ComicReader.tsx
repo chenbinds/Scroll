@@ -4,6 +4,7 @@ import { parseComic, type ComicPage } from '../../lib/comicParser'
 import { useAppStore } from '../../stores/appStore'
 import { useAnnotationStore } from '../../stores/annotationStore'
 import { annotationFormatForBook } from '../../lib/annotationTypes'
+import { shouldIgnoreReaderShortcut } from '../../lib/readerShortcuts'
 import { useI18n } from '../../lib/i18n'
 import BackToLibraryButton from './BackToLibraryButton'
 import AnnotationToolbar from './annotation/AnnotationToolbar'
@@ -152,6 +153,7 @@ export default function ComicReader({ filePath, format, onClose, onPageChange, i
   // Keyboard
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      if (shouldIgnoreReaderShortcut(e)) return
       if (e.key === 'ArrowRight' || e.key === 'l') nextPage()
       if (e.key === 'ArrowLeft' || e.key === 'h') prevPage()
       if (e.key === 'ArrowDown' || e.key === 'j') containerRef.current?.scrollBy({ top: 200, behavior: 'smooth' })

@@ -5,6 +5,7 @@ import { useAppStore } from '../../stores/appStore'
 import { useReaderFontSize } from '../../lib/useReaderFontSize'
 import { useAnnotationStore } from '../../stores/annotationStore'
 import { annotationFormatForBook } from '../../lib/annotationTypes'
+import { shouldIgnoreReaderShortcut } from '../../lib/readerShortcuts'
 import ReaderThemeBar from './ReaderThemeBar'
 import BackToLibraryButton from './BackToLibraryButton'
 import AnnotationToolbar from './annotation/AnnotationToolbar'
@@ -170,6 +171,7 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      if (shouldIgnoreReaderShortcut(e)) return
       if (e.key === 'ArrowDown' || e.key === 'j') contentRef.current?.scrollBy({ top: 80, behavior: 'smooth' })
       if (e.key === 'ArrowUp' || e.key === 'k') contentRef.current?.scrollBy({ top: -80, behavior: 'smooth' })
       if (e.key === ' ') { e.preventDefault(); contentRef.current?.scrollBy({ top: contentRef.current!.clientHeight * 0.8, behavior: 'smooth' }) }

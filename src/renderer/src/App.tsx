@@ -6,6 +6,7 @@ import { getThemeCssVars } from './lib/readingTheme'
 import { cleanBookTitle } from './lib/bookTitle'
 import { isBootstrapHydrated } from './bootstrapHydrate'
 import UnsavedAnnotationsDialog from './components/reader/annotation/UnsavedAnnotationsDialog'
+import { useMusicStore } from './stores/musicStore'
 
 const LibraryView = lazy(() => import('./components/library/LibraryView'))
 
@@ -210,7 +211,10 @@ export default function App() {
         // Polyline/polygon draft → Esc cancels draft only (Phase S leave still via 返回/X)
         if (store.hasClickDraft) return
         const canLeave = store.requestLeave('library')
-        if (canLeave) setCurrentView('library')
+        if (canLeave) {
+          useMusicStore.getState().pause()
+          setCurrentView('library')
+        }
       }
     }
     window.addEventListener('keydown', handleKeyDown)

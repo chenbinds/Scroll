@@ -4,6 +4,7 @@ import * as pdfjsLib from 'pdfjs-dist'
 import { useAppStore } from '../../stores/appStore'
 import { useAnnotationStore } from '../../stores/annotationStore'
 import { annotationFormatForBook } from '../../lib/annotationTypes'
+import { shouldIgnoreReaderShortcut } from '../../lib/readerShortcuts'
 import AnnotationToolbar from './annotation/AnnotationToolbar'
 import AnnotationOverlay from './annotation/AnnotationOverlay'
 import HighlightLayer from './annotation/HighlightLayer'
@@ -241,6 +242,7 @@ export default function PdfReader({ filePath, onClose, onPageChange, initialPage
   // Keyboard
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      if (shouldIgnoreReaderShortcut(e)) return
       if (e.key === 'ArrowDown') containerRef.current?.scrollBy({ top: 80, behavior: 'smooth' })
       if (e.key === 'ArrowUp') containerRef.current?.scrollBy({ top: -80, behavior: 'smooth' })
       if (e.key === ' ' || e.key === 'PageDown') {

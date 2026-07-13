@@ -23,25 +23,39 @@ interface MusicState {
 
   isExpanded: boolean
   showMiniPlayer: boolean
+  hydrated: boolean
+  /** 本地文件路径不存在或无法播放 */
+  unavailableTrackIds: string[]
 
   setPlaylist: (tracks: MusicTrack[]) => void
-  addTrack: (track: MusicTrack) => void
+  addTrack: (track: MusicTrack) => boolean
   removeTrack: (id: string) => void
   playTrack: (index: number) => void
   nextTrack: () => void
   prevTrack: () => void
   togglePlay: () => void
+  pause: () => void
   setVolume: (v: number) => void
   setCurrentTime: (t: number) => void
   setDuration: (d: number) => void
   setExpanded: (e: boolean) => void
   setShowMiniPlayer: (s: boolean) => void
+  setHydrated: (h: boolean) => void
+  setUnavailableTrackIds: (ids: string[]) => void
+  markTrackUnavailable: (id: string) => void
+  hydrate: (payload: {
+    playlist: MusicTrack[]
+    volume: number
+    currentIndex: number
+    showMiniPlayer: boolean
+    unavailableTrackIds?: string[]
+  }) => void
 
   currentTrack: () => MusicTrack | null
 }
 
 // Built-in ambient sound generators (Web Audio API, 100% copyright-free, works offline)
-const BUILTIN_GENERATORS: MusicTrack[] = [
+export const BUILTIN_GENERATORS: MusicTrack[] = [
   {
     id: 'builtin-white-noise',
     title: 'White Noise',
@@ -80,6 +94,24 @@ const BUILTIN_GENERATORS: MusicTrack[] = [
   }
 ]
 
+const BUILTIN_ID_SET = new Set(BUILTIN_GENERATORS.map((t) => t.id))
+
+export function mergePlaylist(userTracks: MusicTrack[]): MusicTrack[] {
+  const merged = [...BUILTIN_GENERATORS]
+  const seenIds = new Set(BUILTIN_ID_SET)
+  const seenSrc = new Set(BUILTIN_GENERATORS.map((t) => t.src))
+
+  for (const track of userTracks) {
+    if (track.source === 'generator') continue
+    if (seenIds.has(track.id) || seenSrc.has(track.src)) continue
+    merged.push(track)
+    seenIds.add(track.id)
+    seenSrc.add(track.src)
+  }
+
+  return merged
+}
+
 export const useMusicStore = create<MusicState>((set, get) => ({
   playlist: [...BUILTIN_GENERATORS],
   currentIndex: -1,
@@ -91,14 +123,20 @@ export const useMusicStore = create<MusicState>((set, get) => ({
 
   isExpanded: false,
   showMiniPlayer: false,
+  hydrated: false,
+  unavailableTrackIds: [],
 
   setPlaylist: (tracks) => set({ playlist: tracks }),
 
-  addTrack: (track) =>
+  addTrack: (track) => {
+    let added = false
     set((s) => {
-      if (s.playlist.find((t) => t.src === track.src)) return s
+      if (s.playlist.some((t) => t.id === track.id || t.src === track.src)) return s
+      added = true
       return { playlist: [...s.playlist, track] }
-    }),
+    })
+    return added
+  },
 
   removeTrack: (id) =>
     set((s) => {
@@ -110,7 +148,11 @@ export const useMusicStore = create<MusicState>((set, get) => ({
       } else if (idx < s.currentIndex) {
         newIdx = s.currentIndex - 1
       }
-      return { playlist: newList, currentIndex: newIdx }
+      return {
+        playlist: newList,
+        currentIndex: newIdx,
+        unavailableTrackIds: s.unavailableTrackIds.filter((x) => x !== id)
+      }
     }),
 
   playTrack: (index) =>
@@ -137,11 +179,27 @@ export const useMusicStore = create<MusicState>((set, get) => ({
 
   togglePlay: () => set((s) => ({ isPlaying: !s.isPlaying })),
 
+  pause: () => set((s) => (s.isPlaying ? { isPlaying: false } : s)),
+
   setVolume: (v) => set({ volume: v }),
   setCurrentTime: (t) => set({ currentTime: t }),
   setDuration: (d) => set({ duration: d }),
   setExpanded: (e) => set({ isExpanded: e }),
   setShowMiniPlayer: (s) => set({ showMiniPlayer: s }),
+  setHydrated: (h) => set({ hydrated: h }),
+  setUnavailableTrackIds: (ids) => set({ unavailableTrackIds: ids }),
+  markTrackUnavailable: (id) =>
+    set((s) => (s.unavailableTrackIds.includes(id) ? s : { unavailableTrackIds: [...s.unavailableTrackIds, id] })),
+
+  hydrate: (payload) =>
+    set({
+      playlist: payload.playlist,
+      volume: payload.volume,
+      currentIndex: payload.currentIndex,
+      showMiniPlayer: payload.showMiniPlayer,
+      unavailableTrackIds: payload.unavailableTrackIds ?? [],
+      hydrated: true
+    }),
 
   currentTrack: () => {
     const { playlist, currentIndex } = get()

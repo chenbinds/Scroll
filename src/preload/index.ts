@@ -17,6 +17,8 @@ function listenStreamChunk(
 contextBridge.exposeInMainWorld('scrollAPI', {
   openBookDialog: () => ipcRenderer.invoke('dialog:openBook'),
   openMusicDialog: () => ipcRenderer.invoke('dialog:openMusic'),
+  pathExists: (filePath: string) => ipcRenderer.invoke('fs:pathExists', filePath) as Promise<boolean>,
+  openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url) as Promise<boolean>,
   readFile: (filePath: string) => ipcRenderer.invoke('file:read', filePath),
   readPath: (filePath: string) => ipcRenderer.invoke('file:readPath', filePath),
 
@@ -82,6 +84,8 @@ export interface ScrollAPI {
   doubanSearch: (title: string, author?: string) => Promise<DoubanSearchResult>
   openBookDialog: () => Promise<string[] | null>
   openMusicDialog: () => Promise<string[] | null>
+  pathExists: (filePath: string) => Promise<boolean>
+  openExternal: (url: string) => Promise<boolean>
   readFile: (filePath: string) => Promise<string>
   readPath: (filePath: string) => Promise<string | null>
   getDataPath: () => Promise<string>

@@ -85,7 +85,7 @@ export default function RightSidebar() {
           <X size={16} />
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-hidden min-h-0">
         <AiPanel />
       </div>
     </aside>

@@ -8,6 +8,7 @@ import ReaderThemeBar from './ReaderThemeBar'
 import BackToLibraryButton from './BackToLibraryButton'
 import { useAnnotationStore } from '../../stores/annotationStore'
 import { annotationFormatForBook } from '../../lib/annotationTypes'
+import { shouldIgnoreReaderShortcut } from '../../lib/readerShortcuts'
 import AnnotationToolbar from './annotation/AnnotationToolbar'
 import AnnotationOverlay from './annotation/AnnotationOverlay'
 import HighlightLayer from './annotation/HighlightLayer'
@@ -205,6 +206,7 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
   // Keyboard
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      if (shouldIgnoreReaderShortcut(e)) return
       if (e.key === 'ArrowDown' || e.key === 'j') contentRef.current?.scrollBy({ top: 80, behavior: 'smooth' })
       if (e.key === 'ArrowUp' || e.key === 'k') contentRef.current?.scrollBy({ top: -80, behavior: 'smooth' })
       if (e.key === ' ') { e.preventDefault(); contentRef.current?.scrollBy({ top: contentRef.current!.clientHeight * 0.8, behavior: 'smooth' }) }

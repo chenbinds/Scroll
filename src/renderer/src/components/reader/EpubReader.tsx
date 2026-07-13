@@ -12,6 +12,7 @@ import HighlightLayer from './annotation/HighlightLayer'
 import MarkSelectionHandler from './annotation/MarkSelectionHandler'
 import { useAnnotationStore } from '../../stores/annotationStore'
 import { annotationFormatForBook } from '../../lib/annotationTypes'
+import { shouldIgnoreReaderShortcut } from '../../lib/readerShortcuts'
 
 interface Props {
   filePath: string
@@ -206,6 +207,7 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
   // Keyboard
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      if (shouldIgnoreReaderShortcut(e)) return
       if (e.key === 'ArrowDown' || e.key === 'j') contentRef.current?.scrollBy({ top: 80, behavior: 'smooth' })
       if (e.key === 'ArrowUp' || e.key === 'k') contentRef.current?.scrollBy({ top: -80, behavior: 'smooth' })
       if (e.key === ' ') { e.preventDefault(); contentRef.current?.scrollBy({ top: contentRef.current!.clientHeight * 0.8, behavior: 'smooth' }) }
