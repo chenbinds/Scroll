@@ -1,4 +1,4 @@
-import { Book, Moon, Sun, Settings, Bookmark, MessageCircle, FileText, Music } from 'lucide-react'
+import { Book, Settings, Bookmark, MessageCircle, FileText, Music } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useMusicStore } from '../../stores/musicStore'
 import { useI18n } from '../../lib/i18n'
@@ -10,7 +10,7 @@ interface Props {
 export default function TopBar({ onOpenSettings }: Props) {
   const { t } = useI18n()
   const {
-    currentView, darkMode, toggleDarkMode,
+    currentView,
     leftSidebarOpen, leftSidebarTab, toggleLeftSidebar,
     rightSidebarOpen, toggleRightSidebar
   } = useAppStore()
@@ -58,7 +58,7 @@ export default function TopBar({ onOpenSettings }: Props) {
               <Bookmark size={18} />
             </button>
 
-            <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
+            <div className="chrome-divider" />
 
             {/* Right sidebar toggle: AI */}
             <button
@@ -72,7 +72,7 @@ export default function TopBar({ onOpenSettings }: Props) {
             >
               <MessageCircle size={18} />
             </button>
-            <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-2" />
+            <div className="chrome-divider" />
           </>
         )}
 
@@ -89,14 +89,6 @@ export default function TopBar({ onOpenSettings }: Props) {
           title={t('app.music')}
         >
           <Music size={18} />
-        </button>
-
-        <button
-          onClick={toggleDarkMode}
-          className="p-2 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          title={darkMode ? t('app.theme.light') : t('app.theme.dark')}
-        >
-          {darkMode ? <Sun size={18} /> : <Moon size={18} />}
         </button>
 
         <button

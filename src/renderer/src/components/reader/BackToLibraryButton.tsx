@@ -5,18 +5,19 @@ interface Props {
   onClick: () => void
 }
 
-/** Prominent back-to-library control for reader toolbars / top bar */
+/** Back-to-library control — matches reader chrome theme */
 export default function BackToLibraryButton({ onClick }: Props) {
   const { t } = useI18n()
   return (
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm font-medium
-                 bg-scroll-500 text-white hover:bg-scroll-600 active:bg-scroll-700
-                 transition-colors shrink-0 shadow-sm"
+      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-sm font-medium shrink-0
+                 chrome-muted border border-[var(--reader-border)]
+                 bg-[var(--reader-surface-raised)] hover:bg-[var(--reader-bg)]
+                 hover:text-[var(--reader-text)] transition-colors"
     >
-      <ArrowLeft size={15} strokeWidth={2.5} />
+      <ArrowLeft size={15} strokeWidth={2} />
       <span>{t('app.backToLibrary')}</span>
     </button>
   )

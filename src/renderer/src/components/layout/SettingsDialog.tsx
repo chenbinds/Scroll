@@ -3,6 +3,7 @@ import { X, Eye, EyeOff, Save, Trash2, Globe, Key, Cpu, Sparkles, Wifi } from 'l
 import { useAppStore } from '../../stores/appStore'
 import { useI18n, type Language } from '../../lib/i18n'
 import { testConnection } from '../../lib/aiService'
+import ThemeSelect from '../reader/ThemeSelect'
 
 interface Props {
   onClose: () => void
@@ -19,7 +20,7 @@ const AI_PRESETS: Record<string, { name: string; baseUrl: string; model: string 
 
 export default function SettingsDialog({ onClose }: Props) {
   const { t, language, setLanguage } = useI18n()
-  const { aiConfig, setAiConfig, darkMode, setDarkMode } = useAppStore()
+  const { aiConfig, setAiConfig } = useAppStore()
   const [showKey, setShowKey] = useState(false)
   const [name, setName] = useState(aiConfig.name)
   const [baseUrl, setBaseUrl] = useState(aiConfig.baseUrl)
@@ -183,24 +184,7 @@ export default function SettingsDialog({ onClose }: Props) {
           {/* ===== Appearance ===== */}
           <section>
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{t('settings.appearance')}</h3>
-            <div className="flex gap-2">
-              <button onClick={() => setDarkMode(true)}
-                className={`px-4 py-2 text-sm rounded-lg border transition-colors ${
-                  darkMode
-                    ? 'bg-scroll-500 text-white border-scroll-500'
-                    : 'border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}>
-                {t('settings.appearance.darkMode')}
-              </button>
-              <button onClick={() => setDarkMode(false)}
-                className={`px-4 py-2 text-sm rounded-lg border transition-colors ${
-                  !darkMode
-                    ? 'bg-scroll-500 text-white border-scroll-500'
-                    : 'border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}>
-                {language === 'zh' ? '亮色模式' : 'Light'}
-              </button>
-            </div>
+            <ThemeSelect variant="settings" />
           </section>
 
           {/* ===== Privacy ===== */}

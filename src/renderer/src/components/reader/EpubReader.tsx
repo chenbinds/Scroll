@@ -13,6 +13,7 @@ import MarkSelectionHandler from './annotation/MarkSelectionHandler'
 import { useAnnotationStore } from '../../stores/annotationStore'
 import { annotationFormatForBook } from '../../lib/annotationTypes'
 import { shouldIgnoreReaderShortcut } from '../../lib/readerShortcuts'
+import { readScrollPercent, restoreScrollPercent } from '../../lib/scrollProgress'
 
 interface Props {
   filePath: string
@@ -34,6 +35,7 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
   const [epubContent, setEpubContent] = useState<EpubContent | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const hasRestoredRef = useRef(false)
+  const restoringRef = useRef(false)
   const currentBook = useAppStore((s) => s.currentBook)
 
   // Callback ref: stores the DOM element in Zustand for TocPanel to use
@@ -58,10 +60,30 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
     return () => { useAnnotationStore.getState().reset() }
   }, [currentBook?.id, currentBook?.format])
 
+  const flushProgress = useCallback(() => {
+    const el = contentRef.current
+    if (!el || !epubContent) return
+    const pct = readScrollPercent(el)
+    let currentIdx = 0
+    const chapters = el.querySelectorAll('[data-chapter]')
+    const containerRect = el.getBoundingClientRect()
+    const viewTop = containerRect.top + containerRect.height * 0.2
+    for (const ch of chapters) {
+      const rect = ch.getBoundingClientRect()
+      if (rect.top <= viewTop) currentIdx = Number((ch as HTMLElement).dataset.chapter) || 0
+      else break
+    }
+    onProgress?.(currentIdx, epubContent.spine.length, pct)
+  }, [epubContent, onProgress])
+
+  const flushProgressRef = useRef(flushProgress)
+  flushProgressRef.current = flushProgress
+
   const requestClose = useCallback(() => {
+    flushProgress()
     const canLeave = useAnnotationStore.getState().requestLeave('library')
     if (canLeave) onClose()
-  }, [onClose])
+  }, [onClose, flushProgress])
 
   // Load EPUB
   useEffect(() => {
@@ -126,43 +148,55 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
     return () => { cancelled = true }
   }, [filePath])
 
-  // Restore reading position
+  // Restore reading position (high precision + re-apply while layout settles)
   useEffect(() => {
     if (!epubContent || hasRestoredRef.current) return
 
-    // Determine the target scroll position
     const pct = initialProgress && initialProgress > 0 && initialProgress < 100 ? initialProgress : null
-    if (!initialChapterIndex && !pct) { hasRestoredRef.current = true; return }
+    if (!pct && !(initialChapterIndex && initialChapterIndex > 0)) {
+      hasRestoredRef.current = true
+      return
+    }
 
     hasRestoredRef.current = true
+    restoringRef.current = true
 
-    const tryScroll = (attempts: number) => {
-      const container = contentRef.current
-      if (!container) { if (attempts < 10) setTimeout(() => tryScroll(attempts + 1), 200); return }
-
-      let targetTop: number | null = null
-
-      if (pct) {
-        // Percentage-based: accurate within ± several pages
-        const total = container.scrollHeight - container.clientHeight
-        if (total > 0) targetTop = Math.round((total * pct) / 100)
-      }
-
-      if (targetTop == null && initialChapterIndex && initialChapterIndex > 0) {
-        // Chapter-based fallback
-        const el = container.querySelector(`[data-chapter="${initialChapterIndex}"]`) as HTMLElement | null
-        if (!el) { if (attempts < 10) setTimeout(() => tryScroll(attempts + 1), 200); return }
-        const containerRect = container.getBoundingClientRect()
-        const elRect = el.getBoundingClientRect()
-        targetTop = container.scrollTop + (elRect.top - containerRect.top) - 80
-      }
-
-      if (targetTop != null) {
-        container.scrollTo({ top: targetTop, behavior: 'instant' })
-      }
+    if (pct) {
+      const stop = restoreScrollPercent(() => contentRef.current, pct)
+      const doneTimer = setTimeout(() => { restoringRef.current = false }, 4200)
+      return () => { stop(); clearTimeout(doneTimer); restoringRef.current = false }
     }
-    setTimeout(() => tryScroll(0), 100)
+
+    // Chapter-based fallback only
+    let cancelled = false
+    const tryChapter = (attempts: number) => {
+      if (cancelled) return
+      const container = contentRef.current
+      if (!container) {
+        if (attempts < 10) setTimeout(() => tryChapter(attempts + 1), 200)
+        else restoringRef.current = false
+        return
+      }
+      const el = container.querySelector(`[data-chapter="${initialChapterIndex}"]`) as HTMLElement | null
+      if (!el) {
+        if (attempts < 10) setTimeout(() => tryChapter(attempts + 1), 200)
+        else restoringRef.current = false
+        return
+      }
+      const containerRect = container.getBoundingClientRect()
+      const elRect = el.getBoundingClientRect()
+      container.scrollTop = container.scrollTop + (elRect.top - containerRect.top) - 80
+      restoringRef.current = false
+    }
+    setTimeout(() => tryChapter(0), 100)
+    return () => { cancelled = true; restoringRef.current = false }
   }, [epubContent, initialChapterIndex, initialProgress])
+
+  // Flush only on true unmount — do NOT depend on flushProgress identity
+  // (parent passes a new onProgress every render; cleanup would infinite-loop)
+  useEffect(() => {
+    return () => { flushProgressRef.current() }
+  }, [])
 
   // Scroll progress tracking
   useEffect(() => {
@@ -171,8 +205,8 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
     let ticking = false
 
     const update = () => {
-      const total = el.scrollHeight - el.clientHeight
-      const pct = total > 0 ? Math.round((el.scrollTop / total) * 100) : 0
+      if (restoringRef.current) return
+      const pct = readScrollPercent(el)
 
       let currentIdx = 0
       const chapters = el.querySelectorAll('[data-chapter]')
@@ -198,11 +232,12 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
   const setNavigateToPercent = useAppStore((s) => s.setNavigateToPercent)
   useEffect(() => {
     if (navigateToPercent === null || !contentRef.current) return
-    const el = contentRef.current
-    const total = el.scrollHeight - el.clientHeight
-    if (total > 0) el.scrollTop = Math.round((total * navigateToPercent) / 100)
+    restoringRef.current = true
+    const stop = restoreScrollPercent(() => contentRef.current, navigateToPercent, { maxMs: 1500 })
     setNavigateToPercent(null)
-  }, [navigateToPercent])
+    const t = setTimeout(() => { restoringRef.current = false }, 1600)
+    return () => { stop(); clearTimeout(t); restoringRef.current = false }
+  }, [navigateToPercent, setNavigateToPercent])
 
   // Keyboard
   useEffect(() => {

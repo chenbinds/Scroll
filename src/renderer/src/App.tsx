@@ -114,8 +114,8 @@ export default function App() {
       if (data.bookmarksByBook && typeof data.bookmarksByBook === 'object' && !Array.isArray(data.bookmarksByBook)) {
         st.setBookmarksByBook(data.bookmarksByBook as Record<string, Parameters<typeof st.setBookmarks>[0]>)
       }
-      if (typeof data.darkMode === 'boolean') st.setDarkMode(data.darkMode)
       if (typeof data.readingTheme === 'string') st.setReadingTheme(data.readingTheme as any)
+      else if (typeof data.darkMode === 'boolean') st.setDarkMode(data.darkMode)
       if (typeof data.readingFont === 'string') st.setReadingFont(data.readingFont as any)
       if (typeof data.readerFontSize === 'number') st.setReaderFontSize(data.readerFontSize)
       if (data.aiConfig) st.setAiConfig(data.aiConfig as any)
@@ -183,10 +183,12 @@ export default function App() {
   }, [currentBook])
 
   useEffect(() => {
-    if (currentView === 'library') {
-      useAppStore.getState().setToc([])
+    if (currentView !== 'reader' || !currentBook) return
+    return () => {
+      // Esc / 窗口切换离开时同步落盘（按钮离开也会再 flush 一次，无害）
+      void window.scrollAPI.storage.set('books', useAppStore.getState().books)
     }
-  }, [currentView])
+  }, [currentView, currentBook?.id])
 
   const handlePageChange = useCallback((page: number, total: number) => {
     if (currentBook) {
@@ -240,7 +242,7 @@ export default function App() {
           initialProgress={currentBook.progress || undefined}
           onProgress={(chapterIndex, _count, progress) => {
             updateBookProgress(currentBook.id, progress, chapterIndex)
-            useAppStore.getState().setReadingPosition({ chapter: String(chapterIndex), page: chapterIndex, percent: progress })
+            useAppStore.getState().setReadingPosition({ chapter: String(chapterIndex), page: chapterIndex, percent: Math.round(progress) })
           }}
           onTocReady={(toc) => { useAppStore.getState().setToc(toc) }} />
 
@@ -251,7 +253,7 @@ export default function App() {
           initialProgress={currentBook.progress || undefined}
           onProgress={(pct) => {
             updateBookProgress(currentBook.id, pct, 0)
-            useAppStore.getState().setReadingPosition({ percent: pct })
+            useAppStore.getState().setReadingPosition({ percent: Math.round(pct) })
           }} />
 
       case 'MOBI':
@@ -261,7 +263,7 @@ export default function App() {
           initialProgress={currentBook.progress || undefined}
           onProgress={(chapterIndex, _count, progress) => {
             updateBookProgress(currentBook.id, progress, chapterIndex)
-            useAppStore.getState().setReadingPosition({ chapter: String(chapterIndex), page: chapterIndex, percent: progress })
+            useAppStore.getState().setReadingPosition({ chapter: String(chapterIndex), page: chapterIndex, percent: Math.round(progress) })
           }}
           onTocReady={(toc) => { useAppStore.getState().setToc(toc) }}
           />

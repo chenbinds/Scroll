@@ -9,6 +9,7 @@ import BackToLibraryButton from './BackToLibraryButton'
 import { useAnnotationStore } from '../../stores/annotationStore'
 import { annotationFormatForBook } from '../../lib/annotationTypes'
 import { shouldIgnoreReaderShortcut } from '../../lib/readerShortcuts'
+import { readScrollPercent, restoreScrollPercent } from '../../lib/scrollProgress'
 import AnnotationToolbar from './annotation/AnnotationToolbar'
 import AnnotationOverlay from './annotation/AnnotationOverlay'
 import HighlightLayer from './annotation/HighlightLayer'
@@ -31,6 +32,7 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
   const [chapters, setChapters] = useState<MobiChapter[]>([])
   const contentRef = useRef<HTMLDivElement | null>(null)
   const hasRestoredRef = useRef(false)
+  const restoringRef = useRef(false)
   const currentBook = useAppStore((s) => s.currentBook)
 
   // Callback ref: stores DOM el in Zustand for TocPanel
@@ -52,10 +54,30 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
     return () => { useAnnotationStore.getState().reset() }
   }, [currentBook?.id, currentBook?.format])
 
+  const flushProgress = useCallback(() => {
+    const el = contentRef.current
+    if (!el || chapters.length === 0) return
+    const pct = readScrollPercent(el)
+    let currentIdx = 0
+    const sections = el.querySelectorAll('[data-chapter]')
+    const containerRect = el.getBoundingClientRect()
+    const viewTop = containerRect.top + containerRect.height * 0.2
+    for (const sec of Array.from(sections)) {
+      const rect = sec.getBoundingClientRect()
+      if (rect.top <= viewTop) currentIdx = Number((sec as HTMLElement).dataset.chapter) || 0
+      else break
+    }
+    onProgress?.(currentIdx, chapters.length, pct)
+  }, [chapters, onProgress])
+
+  const flushProgressRef = useRef(flushProgress)
+  flushProgressRef.current = flushProgress
+
   const requestClose = useCallback(() => {
+    flushProgress()
     const canLeave = useAnnotationStore.getState().requestLeave('library')
     if (canLeave) onClose()
-  }, [onClose])
+  }, [onClose, flushProgress])
 
   // Load MOBI/AZW3 via foliate-js
   useEffect(() => {
@@ -148,20 +170,15 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
     if (!pct) { hasRestoredRef.current = true; return }
 
     hasRestoredRef.current = true
-
-    const tryScroll = (attempts: number) => {
-      const container = contentRef.current
-      if (!container) {
-        if (attempts < 10) setTimeout(() => tryScroll(attempts + 1), 200)
-        return
-      }
-      const total = container.scrollHeight - container.clientHeight
-      if (total > 0) {
-        container.scrollTop = Math.round((total * pct) / 100)
-      }
-    }
-    setTimeout(() => tryScroll(0), 100)
+    restoringRef.current = true
+    const stop = restoreScrollPercent(() => contentRef.current, pct)
+    const doneTimer = setTimeout(() => { restoringRef.current = false }, 4200)
+    return () => { stop(); clearTimeout(doneTimer); restoringRef.current = false }
   }, [chapters, initialProgress])
+
+  useEffect(() => {
+    return () => { flushProgressRef.current() }
+  }, [])
 
   // Scroll progress tracking
   useEffect(() => {
@@ -170,8 +187,8 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
     let ticking = false
 
     const update = () => {
-      const total = el.scrollHeight - el.clientHeight
-      const pct = total > 0 ? Math.round((el.scrollTop / total) * 100) : 0
+      if (restoringRef.current) return
+      const pct = readScrollPercent(el)
 
       let currentIdx = 0
       const sections = el.querySelectorAll('[data-chapter]')
@@ -197,10 +214,11 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
   const setNavigateToPercent = useAppStore((s) => s.setNavigateToPercent)
   useEffect(() => {
     if (navigateToPercent === null || !contentRef.current) return
-    const el = contentRef.current
-    const total = el.scrollHeight - el.clientHeight
-    if (total > 0) el.scrollTop = Math.round((total * navigateToPercent) / 100)
+    restoringRef.current = true
+    const stop = restoreScrollPercent(() => contentRef.current, navigateToPercent, { maxMs: 1500 })
     setNavigateToPercent(null)
+    const t = setTimeout(() => { restoringRef.current = false }, 1600)
+    return () => { stop(); clearTimeout(t); restoringRef.current = false }
   }, [navigateToPercent, setNavigateToPercent])
 
   // Keyboard

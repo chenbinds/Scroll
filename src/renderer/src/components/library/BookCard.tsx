@@ -229,7 +229,7 @@ export default function BookCard({ book, onClick, onDelete, onRefreshRating, onS
             {book.title}
           </h3>
           <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate mt-0.5">
-            {book.progress >= 100 ? 'Read' : book.progress > 0 ? `${book.progress}%` : book.author}
+            {book.progress >= 100 ? 'Read' : book.progress > 0 ? `${Math.round(book.progress)}%` : book.author}
           </p>
         </div>
       </div>

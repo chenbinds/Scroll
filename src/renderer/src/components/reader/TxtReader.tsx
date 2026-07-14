@@ -6,6 +6,7 @@ import { useReaderFontSize } from '../../lib/useReaderFontSize'
 import { useAnnotationStore } from '../../stores/annotationStore'
 import { annotationFormatForBook } from '../../lib/annotationTypes'
 import { shouldIgnoreReaderShortcut } from '../../lib/readerShortcuts'
+import { readScrollPercent, restoreScrollPercent } from '../../lib/scrollProgress'
 import ReaderThemeBar from './ReaderThemeBar'
 import BackToLibraryButton from './BackToLibraryButton'
 import AnnotationToolbar from './annotation/AnnotationToolbar'
@@ -28,6 +29,7 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
   const { fontSize, increaseFont, decreaseFont } = useReaderFontSize()
   const contentRef = useRef<HTMLDivElement | null>(null)
   const hasRestoredRef = useRef(false)
+  const restoringRef = useRef(false)
   const currentBook = useAppStore((s) => s.currentBook)
 
   const setContentRef = useCallback((el: HTMLDivElement | null) => {
@@ -48,10 +50,20 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
     return () => { useAnnotationStore.getState().reset() }
   }, [currentBook?.id, currentBook?.format])
 
+  const flushProgress = useCallback(() => {
+    const el = contentRef.current
+    if (!el) return
+    onProgress?.(readScrollPercent(el))
+  }, [onProgress])
+
+  const flushProgressRef = useRef(flushProgress)
+  flushProgressRef.current = flushProgress
+
   const requestClose = useCallback(() => {
+    flushProgress()
     const canLeave = useAnnotationStore.getState().requestLeave('library')
     if (canLeave) onClose()
-  }, [onClose])
+  }, [onClose, flushProgress])
 
   useEffect(() => {
     let cancelled = false
@@ -98,17 +110,19 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
   }, [filePath])
 
   useEffect(() => {
-    if (chapters.length === 0 || !contentRef.current || hasRestoredRef.current) return
+    if (chapters.length === 0 || hasRestoredRef.current) return
     if (!initialProgress || initialProgress <= 0 || initialProgress >= 100) return
 
     hasRestoredRef.current = true
-    requestAnimationFrame(() => {
-      const el = contentRef.current
-      if (!el) return
-      const total = el.scrollHeight - el.clientHeight
-      if (total > 0) el.scrollTop = Math.round((total * initialProgress) / 100)
-    })
+    restoringRef.current = true
+    const stop = restoreScrollPercent(() => contentRef.current, initialProgress)
+    const doneTimer = setTimeout(() => { restoringRef.current = false }, 4200)
+    return () => { stop(); clearTimeout(doneTimer); restoringRef.current = false }
   }, [chapters, initialProgress])
+
+  useEffect(() => {
+    return () => { flushProgressRef.current() }
+  }, [])
 
   useEffect(() => {
     if (!contentRef.current || loading) return
@@ -116,8 +130,8 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
     let ticking = false
 
     const update = () => {
-      const total = el.scrollHeight - el.clientHeight
-      const pct = total > 0 ? Math.round((el.scrollTop / total) * 100) : 0
+      if (restoringRef.current) return
+      const pct = readScrollPercent(el)
       onProgress?.(pct)
 
       let chapterIdx = 0
@@ -149,10 +163,11 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
   const setNavigateToPercent = useAppStore((s) => s.setNavigateToPercent)
   useEffect(() => {
     if (navigateToPercent === null || !contentRef.current) return
-    const el = contentRef.current
-    const total = el.scrollHeight - el.clientHeight
-    if (total > 0) el.scrollTop = Math.round((total * navigateToPercent) / 100)
+    restoringRef.current = true
+    const stop = restoreScrollPercent(() => contentRef.current, navigateToPercent, { maxMs: 1500 })
     setNavigateToPercent(null)
+    const t = setTimeout(() => { restoringRef.current = false }, 1600)
+    return () => { stop(); clearTimeout(t); restoringRef.current = false }
   }, [navigateToPercent, setNavigateToPercent])
 
   const navigateToSpineIndex = useAppStore((s) => s.navigateToSpineIndex)

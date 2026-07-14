@@ -16,5 +16,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
-echo Build complete! You can now run Scroll.vbs
+echo Build complete! Products are in out\
+echo Scroll.vbs will use out\ when it is newer than release\Scroll.exe
+echo For a distributable zip, run pack.bat
 pause

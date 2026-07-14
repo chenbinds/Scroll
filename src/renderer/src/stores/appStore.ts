@@ -143,11 +143,23 @@ export const useAppStore = create<AppState>((set, get) => ({
   setCurrentView: (view) => set({ currentView: view }),
 
   darkMode: true,
-  setDarkMode: (dark) => set({ darkMode: dark }),
-  toggleDarkMode: () => set((s) => ({ darkMode: !s.darkMode })),
+  setDarkMode: (dark) =>
+    set((s) => ({
+      darkMode: dark,
+      // 与阅读主题统一：暗色 ↔ dark；退出暗色时若当前是 dark 主题则回明亮
+      readingTheme: dark ? 'dark' : s.readingTheme === 'dark' ? 'light' : s.readingTheme
+    })),
+  toggleDarkMode: () =>
+    set((s) => {
+      const dark = !s.darkMode
+      return {
+        darkMode: dark,
+        readingTheme: dark ? 'dark' : s.readingTheme === 'dark' ? 'light' : s.readingTheme
+      }
+    }),
 
   readingTheme: 'light',
-  setReadingTheme: (theme) => set({ readingTheme: theme }),
+  setReadingTheme: (theme) => set({ readingTheme: theme, darkMode: theme === 'dark' }),
 
   readingFont: 'system',
   setReadingFont: (font) => set({ readingFont: font }),
@@ -186,13 +198,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
   removeBook: (id) => set((s) => ({ books: s.books.filter((b) => b.id !== id) })),
   updateBookProgress: (id, progress, currentPage) =>
-    set((s) => ({
-      books: sortBooksByRecent(
-        s.books.map((b) =>
-          b.id === id ? { ...b, progress, currentPage, lastReadAt: Date.now() } : b
-        )
-      )
-    })),
+    set((s) => {
+      const patch = { progress, currentPage, lastReadAt: Date.now() }
+      return {
+        books: sortBooksByRecent(
+          s.books.map((b) => (b.id === id ? { ...b, ...patch } : b))
+        ),
+        currentBook:
+          s.currentBook?.id === id ? { ...s.currentBook, ...patch } : s.currentBook
+      }
+    }),
 
   aiConfig: {
     name: 'Not configured',

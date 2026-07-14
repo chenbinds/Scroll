@@ -32,6 +32,11 @@ export default function HighlightLayer({ scrollRef, layoutKey }: Props) {
   const previewMark = useAnnotationStore((s) => s.previewMark)
   const fontSize = useAppStore((s) => s.readerFontSize)
 
+  const highlightsRef = useRef(highlights)
+  highlightsRef.current = highlights
+  const previewRef = useRef(previewMark)
+  previewRef.current = previewMark
+
   const redraw = useCallback(() => {
     const scrollEl = scrollRef.current
     const canvas = canvasRef.current
@@ -58,17 +63,18 @@ export default function HighlightLayer({ scrollRef, layoutKey }: Props) {
     const docH = Math.max(1, scrollEl.scrollHeight)
     ctx.save()
     ctx.translate(-scrollEl.scrollLeft, -scrollEl.scrollTop)
-    drawHighlights(ctx, highlights, docW, docH)
-    if (previewMark) {
+    drawHighlights(ctx, highlightsRef.current, docW, docH)
+    const preview = previewRef.current
+    if (preview) {
       drawHighlights(
         ctx,
         [
           {
             id: '__preview__',
             tool: 'mark',
-            color: previewMark.color,
-            opacity: previewMark.opacity,
-            rects: previewMark.rects,
+            color: preview.color,
+            opacity: preview.opacity,
+            rects: preview.rects,
             anchor: { type: 'document' },
             createdAt: 0
           }
@@ -78,11 +84,50 @@ export default function HighlightLayer({ scrollRef, layoutKey }: Props) {
       )
     }
     ctx.restore()
-  }, [scrollRef, highlights, previewMark])
+  }, [scrollRef])
 
   useLayoutEffect(() => {
     redraw()
-  }, [redraw, fontSize, layoutKey])
+  }, [highlights, fontSize, layoutKey, redraw])
+
+  // Preview must not block first selection (mouseup → popup)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => redraw())
+    return () => cancelAnimationFrame(id)
+  }, [previewMark, redraw])
+
+  // Warm canvas + cheap Range.getClientRects before first mark
+  useEffect(() => {
+    const warm = () => {
+      const scrollEl = scrollRef.current
+      if (scrollEl) {
+        try {
+          const walker = document.createTreeWalker(scrollEl, NodeFilter.SHOW_TEXT)
+          const text = walker.nextNode()
+          if (text && text.textContent) {
+            const range = document.createRange()
+            const len = Math.min(1, text.textContent.length)
+            range.setStart(text, 0)
+            range.setEnd(text, len)
+            range.getClientRects()
+          }
+        } catch {
+          // ignore
+        }
+      }
+      redraw()
+    }
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number
+      cancelIdleCallback?: (id: number) => void
+    }
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(warm, { timeout: 600 })
+      return () => w.cancelIdleCallback?.(id)
+    }
+    const t = window.setTimeout(warm, 120)
+    return () => clearTimeout(t)
+  }, [redraw, scrollRef])
 
   useEffect(() => {
     const scrollEl = scrollRef.current

@@ -29,6 +29,31 @@ function findContentAnchor(
   clientX: number,
   clientY: number
 ): AnnotationAnchor {
+  // Prefer hit-test via elementsFromPoint — avoids walking every chapter on long books
+  const stack = document.elementsFromPoint(clientX, clientY)
+  for (const node of stack) {
+    if (!(node instanceof HTMLElement)) continue
+    if (node.tagName === 'CANVAS') continue
+    let el: HTMLElement | null = node
+    while (el && el !== scrollEl) {
+      if (el.dataset.chapter != null) {
+        return {
+          type: 'document',
+          chapterHref: el.dataset.href,
+          chapterIndex: Number(el.dataset.chapter)
+        }
+      }
+      if (el.dataset.page != null) {
+        return {
+          type: 'pdf-page',
+          pageNum: Number(el.dataset.page) || 1
+        }
+      }
+      el = el.parentElement
+    }
+  }
+
+  // Fallback for edge cases (point outside content box)
   const sections = scrollEl.querySelectorAll('[data-chapter]')
   for (const section of sections) {
     const rect = section.getBoundingClientRect()
@@ -186,9 +211,31 @@ export default function AnnotationOverlay({ scrollRef, layoutKey }: Props) {
     setHasClickDraft(false)
   }, [brushShape, activeTool, setHasClickDraft])
 
+  // Content / stroke changes — sync paint OK
   useLayoutEffect(() => {
     redraw()
-  }, [redraw, fontSize, interactive, brushShape, activeTool, layoutKey])
+  }, [redraw, fontSize, layoutKey])
+
+  // Tool toggle must not block toolbar click (first brush click felt laggy)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => redraw())
+    return () => cancelAnimationFrame(id)
+  }, [interactive, brushShape, activeTool, redraw])
+
+  // Warm canvas GPU buffer after open — before first brush click
+  useEffect(() => {
+    const warm = () => redraw()
+    const ric = (window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number
+      cancelIdleCallback?: (id: number) => void
+    }).requestIdleCallback
+    if (ric) {
+      const id = ric(warm, { timeout: 600 })
+      return () => (window as Window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback?.(id)
+    }
+    const t = window.setTimeout(warm, 120)
+    return () => clearTimeout(t)
+  }, [redraw])
 
   useEffect(() => {
     const scrollEl = scrollRef.current

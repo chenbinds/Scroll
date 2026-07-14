@@ -64,21 +64,20 @@ function findChapterAnchor(
   clientX: number,
   clientY: number
 ): EpubAnchor {
-  const sections = scrollEl.querySelectorAll('[data-chapter]')
-  for (const section of sections) {
-    const rect = section.getBoundingClientRect()
-    if (
-      clientX >= rect.left &&
-      clientX <= rect.right &&
-      clientY >= rect.top &&
-      clientY <= rect.bottom
-    ) {
-      const el = section as HTMLElement
-      return {
-        type: 'document',
-        chapterHref: el.dataset.href,
-        chapterIndex: Number(el.dataset.chapter)
+  const stack = document.elementsFromPoint(clientX, clientY)
+  for (const node of stack) {
+    if (!(node instanceof HTMLElement)) continue
+    if (node.tagName === 'CANVAS') continue
+    let el: HTMLElement | null = node
+    while (el && el !== scrollEl) {
+      if (el.dataset.chapter != null) {
+        return {
+          type: 'document',
+          chapterHref: el.dataset.href,
+          chapterIndex: Number(el.dataset.chapter)
+        }
       }
+      el = el.parentElement
     }
   }
   return { type: 'document' }
@@ -241,29 +240,30 @@ export default function MarkSelectionHandler({ scrollRef }: Props) {
 
         const text = sel.toString().trim().slice(0, 500)
         const rangeBox = range.getBoundingClientRect()
-        // Prefer below selection; flip above if near bottom of viewport
         const preferBelow = rangeBox.bottom + POPUP_HEIGHT_EST + 8 < window.innerHeight
         const pos = preferBelow
           ? popupPosNearClient(rangeBox.left, rangeBox.bottom, true)
           : popupPosNearClient(rangeBox.left, rangeBox.top, false)
+        const color = markColor
+        const opacity = markOpacity
+        const anchor = findChapterAnchor(scrollEl, e.clientX, e.clientY)
 
+        // Popup first — preview paint deferred so mouseup stays responsive
         setPopup({
           mode: 'create',
           rects,
           text,
-          anchor: findChapterAnchor(scrollEl, e.clientX, e.clientY),
-          color: markColor,
-          opacity: markOpacity,
+          anchor,
+          color,
+          opacity,
           popupLeft: pos.left,
           popupTop: pos.top,
           note: ''
         })
-        useAnnotationStore.getState().setPreviewMark({
-          rects,
-          color: markColor,
-          opacity: markOpacity
-        })
         sel.removeAllRanges()
+        requestAnimationFrame(() => {
+          useAnnotationStore.getState().setPreviewMark({ rects, color, opacity })
+        })
       })
     }
 

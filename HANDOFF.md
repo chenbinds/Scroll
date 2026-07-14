@@ -7,6 +7,7 @@
 
 ## 当前状态 (2026-07-14)
 
+- **Git**：`master` 已与 `origin` 同步（`025d0f4`）
 - **阅读**：EPUB / TXT / PDF / CBZ / MOBI(AZW3) 可用
 - **标注**：EPUB/MOBI/TXT 全套；PDF/CBZ 画笔；侧栏列表 + 书签按书
 - **AI**：SSE 流式、按书会话、选区/标注提问、设置页连通性测试
@@ -14,6 +15,7 @@
 - **书架**：按 `lastReadAt` 倒序；Z-Library 外链（`zlib.ch`）
 - **音乐**：P3 完成（持久化、添加曲目弹窗、阅读快捷键冲突）
 - **打包**：`pack.bat` → `dist/Scroll-{ver}-win-x64.zip`
+- **下一优先**：`TODO.md` **P0** 人工验收
 
 ## 启动方式
 
