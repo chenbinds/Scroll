@@ -1,9 +1,18 @@
 /** In-book full-text search for continuous scroll readers (EPUB / TXT / MOBI). */
 
+export interface SearchTitleAnchor {
+  title: string
+  /** Offset into chapter plainText — section starts here */
+  offset: number
+}
+
 export interface SearchChapter {
   chapterIndex: number
+  /** Fallback label when no anchors match */
   title?: string
   plainText: string
+  /** In-file section starts (TOC fragments / headings), sorted by offset */
+  titleAnchors?: SearchTitleAnchor[]
 }
 
 export interface SearchHit {
@@ -17,6 +26,36 @@ export interface SearchHit {
 
 export const SEARCH_HIT_LIMIT = 200
 
+export interface TocLike {
+  label: string
+  href: string
+  spineIndex: number
+  subitems?: TocLike[]
+}
+
+/** Flatten nested TOC. */
+export function flattenToc(toc: TocLike[]): TocLike[] {
+  const out: TocLike[] = []
+  const walk = (items: TocLike[]) => {
+    for (const it of items) {
+      out.push(it)
+      if (it.subitems?.length) walk(it.subitems)
+    }
+  }
+  walk(toc)
+  return out
+}
+
+export function fragmentFromHref(href: string): string | null {
+  const i = href.indexOf('#')
+  if (i < 0 || i === href.length - 1) return null
+  try {
+    return decodeURIComponent(href.slice(i + 1))
+  } catch {
+    return href.slice(i + 1)
+  }
+}
+
 /** HTML → plain text matching browser textContent (for index offsets). */
 export function stripHtmlToPlain(html: string): string {
   try {
@@ -25,6 +64,114 @@ export function stripHtmlToPlain(html: string): string {
   } catch {
     return html.replace(/<[^>]+>/g, '')
   }
+}
+
+function textOffsetOfElement(root: HTMLElement, target: Element): number {
+  // Match stripHtmlToPlain / textContent: sum of text nodes before target
+  const doc = root.ownerDocument
+  if (!doc) return 0
+  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let offset = 0
+  let node: Node | null
+  while ((node = walker.nextNode())) {
+    if (target.contains(node)) return offset
+    offset += (node as Text).data.length
+  }
+  return offset
+}
+
+/**
+ * Section titles inside one spine HTML.
+ * - Headings (h1–h6) mark where a section starts (offset into plainText).
+ * - `carryInTitle` labels content BEFORE the first heading (previous chapter carry-over).
+ * Never assign a later heading’s title to earlier body text.
+ */
+export function buildTitleAnchors(
+  html: string,
+  options?: {
+    tocForSpine?: { label: string; href: string }[]
+    carryInTitle?: string
+  }
+): SearchTitleAnchor[] {
+  let body: HTMLElement
+  try {
+    const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html')
+    body = doc.body
+    if (!body) return []
+  } catch {
+    return []
+  }
+
+  const anchors: SearchTitleAnchor[] = []
+  const byOffset = new Map<number, string>()
+
+  const setAt = (offset: number, title: string) => {
+    const o = Math.max(0, offset)
+    const t = title.replace(/\s+/g, ' ').trim()
+    if (!t) return
+    // Prefer first title at same offset (heading usually registered first)
+    if (!byOffset.has(o)) byOffset.set(o, t)
+  }
+
+  // 1) Headings = authoritative section boundaries
+  body.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((h) => {
+    const title = (h.textContent || '').replace(/\s+/g, ' ').trim()
+    if (!title) return
+    setAt(textOffsetOfElement(body, h), title)
+  })
+
+  // 2) TOC fragments that resolve inside the file (may add more anchors)
+  for (const entry of options?.tocForSpine ?? []) {
+    const frag = fragmentFromHref(entry.href)
+    if (!frag) continue
+    let el: Element | null = null
+    try {
+      el =
+        body.querySelector(`#${CSS.escape(frag)}`) ||
+        body.querySelector(`[name="${CSS.escape(frag)}"]`) ||
+        body.querySelector(`a[id="${CSS.escape(frag)}"]`)
+    } catch {
+      el = null
+    }
+    if (el) setAt(textOffsetOfElement(body, el), entry.label)
+  }
+
+  const sorted = [...byOffset.entries()]
+    .map(([offset, title]) => ({ offset, title }))
+    .sort((a, b) => a.offset - b.offset)
+
+  // 3) Preamble before first heading → previous chapter title (never the upcoming heading)
+  const carry = options?.carryInTitle?.trim()
+  if (carry) {
+    const firstOff = sorted[0]?.offset ?? Infinity
+    if (firstOff > 0) {
+      sorted.unshift({ title: carry, offset: 0 })
+    }
+  } else {
+    // No carry-in: only claim offset 0 if a TOC entry has no fragment (whole-file chapter)
+    const whole = options?.tocForSpine?.find((t) => !fragmentFromHref(t.href))
+    if (whole && (sorted.length === 0 || sorted[0].offset > 0)) {
+      sorted.unshift({ title: whole.label, offset: 0 })
+    }
+  }
+
+  return sorted
+}
+
+/** Nearest preceding section title at plainText offset. */
+export function titleAtOffset(
+  offset: number,
+  anchors: SearchTitleAnchor[] | undefined,
+  fallback?: string
+): string | undefined {
+  if (!anchors || anchors.length === 0) return fallback
+  let title: string | undefined
+  for (const a of anchors) {
+    if (a.offset <= offset) title = a.title
+    else break
+  }
+  // Hit before every anchor (shouldn't happen if offset 0 exists)
+  return title ?? fallback ?? anchors[0]?.title
 }
 
 export function searchChapters(
@@ -60,7 +207,7 @@ export function searchChapters(
         start,
         end,
         snippet,
-        chapterTitle: ch.title
+        chapterTitle: titleAtOffset(start, ch.titleAnchors, ch.title)
       })
       if (hits.length >= limit) return hits
       from = idx + Math.max(1, needleLen)

@@ -14,7 +14,7 @@ import { useAnnotationStore } from '../../stores/annotationStore'
 import { annotationFormatForBook } from '../../lib/annotationTypes'
 import { shouldIgnoreReaderShortcut } from '../../lib/readerShortcuts'
 import { readScrollPercent, restoreScrollPercent } from '../../lib/scrollProgress'
-import { stripHtmlToPlain } from '../../lib/bookSearch'
+import { stripHtmlToPlain, buildTitleAnchors, flattenToc } from '../../lib/bookSearch'
 import { useSearchHitNavigation } from '../../lib/useSearchHitNavigation'
 
 interface Props {
@@ -158,15 +158,32 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
   // Build in-book search index from spine HTML (same body text as renderer)
   useEffect(() => {
     if (!epubContent) return
+    const flatToc = flattenToc(epubContent.toc)
+    let carryInTitle = ''
     const chapters = epubContent.spine.map((item, i) => {
-      const html = epubContent.files.get(item.href) || ''
-      const label =
-        epubContent.toc.find((t) => t.spineIndex === i)?.label ||
+      const html = extractBody(epubContent.files.get(item.href) || '')
+      const tocForSpine = flatToc.filter((t) => t.spineIndex === i)
+      const titleAnchors = buildTitleAnchors(html, {
+        tocForSpine: tocForSpine.map((t) => ({ label: t.label, href: t.href })),
+        carryInTitle: carryInTitle || undefined
+      })
+      const plainText = stripHtmlToPlain(html)
+      const fallback =
+        titleAnchors.find((a) => a.offset === 0)?.title ||
+        titleAnchors[0]?.title ||
+        tocForSpine[0]?.label ||
         item.href
+      // Next file's preamble inherits last section of this file
+      if (titleAnchors.length > 0) {
+        carryInTitle = titleAnchors[titleAnchors.length - 1].title
+      } else if (tocForSpine.length > 0) {
+        carryInTitle = tocForSpine[tocForSpine.length - 1].label
+      }
       return {
         chapterIndex: i,
-        title: label,
-        plainText: stripHtmlToPlain(extractBody(html))
+        title: fallback,
+        plainText,
+        titleAnchors
       }
     })
     useAppStore.getState().setSearchChapters(chapters)

@@ -10,7 +10,7 @@ import { useAnnotationStore } from '../../stores/annotationStore'
 import { annotationFormatForBook } from '../../lib/annotationTypes'
 import { shouldIgnoreReaderShortcut } from '../../lib/readerShortcuts'
 import { readScrollPercent, restoreScrollPercent } from '../../lib/scrollProgress'
-import { stripHtmlToPlain } from '../../lib/bookSearch'
+import { stripHtmlToPlain, buildTitleAnchors } from '../../lib/bookSearch'
 import { useSearchHitNavigation } from '../../lib/useSearchHitNavigation'
 import AnnotationToolbar from './annotation/AnnotationToolbar'
 import AnnotationOverlay from './annotation/AnnotationOverlay'
@@ -171,12 +171,25 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
 
   useEffect(() => {
     if (chapters.length === 0) return
+    let carryIn = ''
     useAppStore.getState().setSearchChapters(
-      chapters.map((ch, i) => ({
-        chapterIndex: i,
-        title: ch.title,
-        plainText: stripHtmlToPlain(ch.html)
-      }))
+      chapters.map((ch, i) => {
+        const titleAnchors = buildTitleAnchors(ch.html, {
+          tocForSpine: [{ label: ch.title, href: '' }],
+          carryInTitle: carryIn || undefined
+        })
+        if (titleAnchors.length > 0) {
+          carryIn = titleAnchors[titleAnchors.length - 1].title
+        } else {
+          carryIn = ch.title
+        }
+        return {
+          chapterIndex: i,
+          title: ch.title,
+          plainText: stripHtmlToPlain(ch.html),
+          titleAnchors
+        }
+      })
     )
   }, [chapters])
 
