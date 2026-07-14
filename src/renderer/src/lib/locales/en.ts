@@ -111,6 +111,7 @@ const en: Translations = {
   'annotation.notePlaceholder': 'Write a note…',
   'annotation.noteSave': 'Save note',
   'annotation.alreadyMarked': 'This text is already marked',
+  'annotation.markPdfOnly': 'PDF / comics support brush & eraser only (no text marks)',
 
   'ai.notConfigured': 'AI Assistant not configured',
   'ai.notConfigured.desc': 'Go to Settings > AI Service to configure any OpenAI-compatible API',

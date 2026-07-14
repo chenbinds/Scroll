@@ -78,6 +78,7 @@ export default function AnnotationToolbar() {
           icon={Highlighter}
           showChevron
           disabled={!canMark}
+          title={!canMark ? t('annotation.markPdfOnly') : undefined}
           onClick={() => setActiveTool('mark')}
           onChevronClick={() => {
             if (activeTool === 'mark') setPanelOpen(!panelOpen)
