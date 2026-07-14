@@ -1,8 +1,16 @@
-import { X, BookmarkPlus, Highlighter, PenLine } from 'lucide-react'
+import { useState } from 'react'
+import { X, BookmarkPlus, Highlighter, PenLine, Download, Upload } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useAnnotationStore } from '../../stores/annotationStore'
 import { useI18n } from '../../lib/i18n'
+import { annotationFormatForBook } from '../../lib/annotationTypes'
 import type { AnnotationAnchor, AnnotationHighlight, AnnotationStroke } from '../../lib/annotationTypes'
+import {
+  buildAnnotationsMarkdown,
+  buildExportBundle,
+  defaultExportFileName,
+  parseAnnotationsImport
+} from '../../lib/annotationExport'
 
 function jumpToAnchor(
   anchor: AnnotationAnchor,
@@ -40,8 +48,12 @@ export default function BookmarkPanel() {
   const strokes = useAnnotationStore((s) => s.strokes)
   const highlights = useAnnotationStore((s) => s.highlights)
   const loaded = useAnnotationStore((s) => s.loaded)
+  const format = useAnnotationStore((s) => s.format)
+  const replaceAllAndSave = useAnnotationStore((s) => s.replaceAllAndSave)
 
   const setNavigateToTextOffset = useAppStore((s) => s.setNavigateToTextOffset)
+  const [busy, setBusy] = useState(false)
+  const [status, setStatus] = useState<string | null>(null)
 
   const handleAdd = () => {
     const now = new Date()
@@ -92,11 +104,99 @@ export default function BookmarkPanel() {
     useAppStore.getState().setRequestAiPanel(true)
   }
 
+  const persistBookmarksMap = async (next: typeof bookmarks) => {
+    const st = useAppStore.getState()
+    const bookId = st.currentBook?.id
+    if (!bookId) return
+    const map = { ...st.bookmarksByBook, [bookId]: next }
+    st.setBookmarksByBook(map)
+    st.setBookmarks(next)
+    await window.scrollAPI.storage.set('bookmarksByBook', map)
+  }
+
+  const handleExport = async () => {
+    if (!currentBook || busy) return
+    if (highlights.length === 0 && strokes.length === 0 && bookmarks.length === 0) {
+      setStatus(t('bookmarks.importEmpty'))
+      return
+    }
+    setBusy(true)
+    setStatus(null)
+    try {
+      const annFormat = format ?? annotationFormatForBook(currentBook.format)
+      const bundle = buildExportBundle({
+        book: currentBook,
+        format: annFormat,
+        highlights,
+        strokes,
+        bookmarks
+      })
+      const markdown = buildAnnotationsMarkdown(bundle)
+      const result = await window.scrollAPI.saveTextFile({
+        title: t('bookmarks.export'),
+        defaultName: defaultExportFileName(currentBook.title),
+        content: markdown,
+        filters: [{ name: 'Markdown', extensions: ['md'] }]
+      })
+      if (result.ok) setStatus(t('bookmarks.exportOk'))
+      else if (!result.canceled) setStatus(t('bookmarks.exportFail'))
+    } catch {
+      setStatus(t('bookmarks.exportFail'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleImport = async () => {
+    if (!currentBook || busy) return
+    setBusy(true)
+    setStatus(null)
+    try {
+      const file = await window.scrollAPI.openTextFile({
+        title: t('bookmarks.import'),
+        filters: [
+          { name: '标注导出', extensions: ['md', 'json'] },
+          { name: 'Markdown', extensions: ['md'] },
+          { name: 'JSON', extensions: ['json'] }
+        ]
+      })
+      if (!file) {
+        setBusy(false)
+        return
+      }
+
+      const bundle = parseAnnotationsImport(file.content)
+      if (!bundle) {
+        setStatus(t('bookmarks.importFail'))
+        return
+      }
+
+      const ok = await replaceAllAndSave({
+        strokes: bundle.annotations.strokes,
+        highlights: bundle.annotations.highlights
+      })
+      if (!ok) {
+        setStatus(t('bookmarks.importFail'))
+        return
+      }
+
+      if (bundle.bookmarks) {
+        await persistBookmarksMap(bundle.bookmarks)
+      }
+
+      setStatus(t('bookmarks.importOk'))
+    } catch {
+      setStatus(t('bookmarks.importFail'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const hasAnnotations = loaded && (strokes.length > 0 || highlights.length > 0)
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-3 border-b border-gray-200 dark:border-gray-800">
+      <div className="p-3 border-b border-gray-200 dark:border-gray-800 space-y-2">
         <button onClick={handleAdd}
           className="w-full py-2 text-sm text-scroll-600 dark:text-scroll-400
                      border border-dashed border-scroll-300 dark:border-scroll-700
@@ -105,6 +205,33 @@ export default function BookmarkPanel() {
           <BookmarkPlus size={14} />
           {t('bookmarks.addPosition')}
         </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => void handleExport()}
+            disabled={busy || !currentBook}
+            className="flex-1 py-1.5 text-xs chrome-muted border border-[var(--chrome-border)]
+                       rounded-md hover:bg-black/[0.03] dark:hover:bg-white/[0.04]
+                       transition-colors flex items-center justify-center gap-1 disabled:opacity-40"
+          >
+            <Download size={12} />
+            {busy ? t('bookmarks.exportBusy') : t('bookmarks.export')}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleImport()}
+            disabled={busy || !currentBook}
+            className="flex-1 py-1.5 text-xs chrome-muted border border-[var(--chrome-border)]
+                       rounded-md hover:bg-black/[0.03] dark:hover:bg-white/[0.04]
+                       transition-colors flex items-center justify-center gap-1 disabled:opacity-40"
+          >
+            <Upload size={12} />
+            {t('bookmarks.import')}
+          </button>
+        </div>
+        {status && (
+          <p className="text-[11px] text-center text-gray-500 dark:text-gray-400">{status}</p>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -144,7 +271,7 @@ export default function BookmarkPanel() {
           <>
             <div className="px-3 pt-3 pb-1 border-t border-gray-100 dark:border-gray-800/50 mt-1">
               <p className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-600">
-                {t('bookmarks.annotations')} {currentBook ? '' : ''}
+                {t('bookmarks.annotations')}
               </p>
             </div>
             {highlights.map((hl) => (

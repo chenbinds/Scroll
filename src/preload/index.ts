@@ -17,6 +17,23 @@ function listenStreamChunk(
 contextBridge.exposeInMainWorld('scrollAPI', {
   openBookDialog: () => ipcRenderer.invoke('dialog:openBook'),
   openMusicDialog: () => ipcRenderer.invoke('dialog:openMusic'),
+  saveTextFile: (opts: {
+    defaultName?: string
+    content: string
+    title?: string
+    filters?: { name: string; extensions: string[] }[]
+  }) =>
+    ipcRenderer.invoke('dialog:saveTextFile', opts) as Promise<
+      { ok: true; path: string } | { ok: false; canceled?: true; error?: string }
+    >,
+  openTextFile: (opts?: {
+    title?: string
+    filters?: { name: string; extensions: string[] }[]
+  }) =>
+    ipcRenderer.invoke('dialog:openTextFile', opts) as Promise<{
+      path: string
+      content: string
+    } | null>,
   pathExists: (filePath: string) => ipcRenderer.invoke('fs:pathExists', filePath) as Promise<boolean>,
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url) as Promise<boolean>,
   readFile: (filePath: string) => ipcRenderer.invoke('file:read', filePath),
@@ -84,6 +101,16 @@ export interface ScrollAPI {
   doubanSearch: (title: string, author?: string) => Promise<DoubanSearchResult>
   openBookDialog: () => Promise<string[] | null>
   openMusicDialog: () => Promise<string[] | null>
+  saveTextFile: (opts: {
+    defaultName?: string
+    content: string
+    title?: string
+    filters?: { name: string; extensions: string[] }[]
+  }) => Promise<{ ok: true; path: string } | { ok: false; canceled?: true; error?: string }>
+  openTextFile: (opts?: {
+    title?: string
+    filters?: { name: string; extensions: string[] }[]
+  }) => Promise<{ path: string; content: string } | null>
   pathExists: (filePath: string) => Promise<boolean>
   openExternal: (url: string) => Promise<boolean>
   readFile: (filePath: string) => Promise<string>

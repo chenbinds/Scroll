@@ -1,6 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
-import { readFileSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import {
   registerCoverSchemePrivileged,
@@ -114,6 +114,68 @@ ipcMain.handle('dialog:openBook', async () => {
   })
   return result.canceled ? null : result.filePaths
 })
+
+/** Save UTF-8 text (annotation Markdown / JSON export). */
+ipcMain.handle(
+  'dialog:saveTextFile',
+  async (
+    _event,
+    opts: {
+      defaultName?: string
+      content: string
+      title?: string
+      filters?: { name: string; extensions: string[] }[]
+    }
+  ) => {
+    if (typeof opts?.content !== 'string') return { ok: false as const, error: 'invalid' }
+    const result = await dialog.showSaveDialog({
+      title: opts.title || '导出',
+      defaultPath: opts.defaultName || 'export.md',
+      filters: opts.filters ?? [
+        { name: 'Markdown', extensions: ['md'] },
+        { name: '所有文件', extensions: ['*'] }
+      ]
+    })
+    if (result.canceled || !result.filePath) return { ok: false as const, canceled: true as const }
+    try {
+      writeFileSync(result.filePath, opts.content, 'utf-8')
+      return { ok: true as const, path: result.filePath }
+    } catch (e) {
+      console.error('saveTextFile error', e)
+      return { ok: false as const, error: 'write_failed' }
+    }
+  }
+)
+
+/** Open a UTF-8 text file (annotation import). */
+ipcMain.handle(
+  'dialog:openTextFile',
+  async (
+    _event,
+    opts?: {
+      title?: string
+      filters?: { name: string; extensions: string[] }[]
+    }
+  ) => {
+    const result = await dialog.showOpenDialog({
+      title: opts?.title || '导入',
+      filters: opts?.filters ?? [
+        { name: '标注导出', extensions: ['md', 'json'] },
+        { name: 'Markdown', extensions: ['md'] },
+        { name: 'JSON', extensions: ['json'] }
+      ],
+      properties: ['openFile']
+    })
+    if (result.canceled || !result.filePaths[0]) return null
+    try {
+      const content = readFileSync(result.filePaths[0], 'utf-8')
+      return { path: result.filePaths[0], content }
+    } catch (e) {
+      console.error('openTextFile error', e)
+      return null
+    }
+  }
+)
 
 // 读取文件内容（用于 PDF/EPUB 等需要在渲染进程处理的格式）
 ipcMain.handle('file:read', async (_event, filePath: string) => {

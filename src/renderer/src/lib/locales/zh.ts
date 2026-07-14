@@ -45,6 +45,14 @@ const zh = {
   'bookmarks.chapter': '章',
   'bookmarks.brushStroke': '画笔标注',
   'bookmarks.highlight': '高亮标记',
+  'bookmarks.export': '导出 Markdown',
+  'bookmarks.import': '导入',
+  'bookmarks.exportOk': '已导出',
+  'bookmarks.exportFail': '导出失败',
+  'bookmarks.importOk': '已导入并保存',
+  'bookmarks.importFail': '无法识别该文件',
+  'bookmarks.importEmpty': '当前没有可导出的标注或书签',
+  'bookmarks.exportBusy': '处理中…',
 
   // Search
   'search.placeholder': '在本书中搜索…',

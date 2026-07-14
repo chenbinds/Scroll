@@ -49,6 +49,11 @@ interface AnnotationState {
   addHighlight: (hl: AnnotationHighlight) => void
   updateHighlight: (id: string, patch: Partial<Pick<AnnotationHighlight, 'note' | 'color' | 'opacity'>>) => void
   removeHighlight: (id: string) => void
+  /** Replace in-memory annotations (e.g. import) and persist */
+  replaceAllAndSave: (data: {
+    strokes: AnnotationStroke[]
+    highlights: AnnotationHighlight[]
+  }) => Promise<boolean>
   saveNow: () => Promise<boolean>
   discardChanges: () => Promise<void>
   requestLeave: (target: LeaveTarget) => boolean
@@ -164,6 +169,22 @@ export const useAnnotationStore = create<AnnotationState>((set, get) => ({
       highlights: s.highlights.filter((h) => h.id !== id),
       dirty: true
     }))
+  },
+
+  replaceAllAndSave: async ({ strokes, highlights }) => {
+    const { bookId, format } = get()
+    if (!bookId || !format) return false
+    set({ strokes, highlights, dirty: true })
+    try {
+      const file = emptyAnnotationsFile(bookId, format)
+      file.strokes = strokes
+      file.highlights = highlights
+      await saveAnnotations(file)
+      set({ dirty: false })
+      return true
+    } catch {
+      return false
+    }
   },
 
   saveNow: async () => {
