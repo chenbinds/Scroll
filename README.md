@@ -47,6 +47,7 @@
 | 日常启动 | `Scroll.vbs`（优先 `release/Scroll.exe`） |
 | 打包发布 | **`pack.bat`**（PowerShell 驱动；国内镜像；无需 winCodeSign） |
 | 构建（开发） | `rebuild.bat` 或 `npx electron-vite build` |
+| 发布前冒烟 | `smoke-check.bat`（见 [docs/06-troubleshooting.md](./docs/06-troubleshooting.md)） |
 | 开发调试 | `start.bat` |
 
 PowerShell 示例：
@@ -124,6 +125,7 @@ Scroll/
 | [HANDOFF.md](./HANDOFF.md) | 交接索引 |
 | [Information/Handoff_2026-07-14.md](./Information/Handoff_2026-07-14.md) | **当前项目现状** |
 | [docs/05-packaging.md](./docs/05-packaging.md) | 打包与分发 |
+| [docs/06-troubleshooting.md](./docs/06-troubleshooting.md) | 杀软误报、冒烟验收 |
 | [CLAUDE.md](./CLAUDE.md) | Agent 开发约束 |
 | `Information/Handoff_标注_2026-07-13.md` | 标注红线 |
 | `docs/03-music-player-spec.md` | 音乐规格（部分已演进） |

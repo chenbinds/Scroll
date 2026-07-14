@@ -58,9 +58,9 @@
 
 ## P6 — 工程 / 环境
 
-- [ ] Defender / 杀软对 `Scroll.exe` 的误报与排除说明
+- [x] Defender / 杀软对 `Scroll.exe` 的误报与排除说明（`docs/06-troubleshooting.md`）
 - [x] 便携包与 `out/` 双路径（`Scroll.vbs` / `pack.bat` → `docs/05-packaging.md`）
-- [ ] 可选冒烟：打开书 → 滚动 → 回书架 → 再进 → 校验进度与离开弹窗
+- [x] 可选冒烟：`smoke-check.bat`（自动）+ `docs/06-troubleshooting.md` §3.2 人工清单
 
 ## P8 — 本轮已落地（2026-07-14，勿再排进开发）
 

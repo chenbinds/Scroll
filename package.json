@@ -13,6 +13,7 @@
     "package": "electron-vite build && electron-builder --win portable",
     "package:portable": "electron-vite build && electron-builder --win portable",
     "pack": "electron-vite build && electron-builder --win portable",
+    "smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-check.ps1",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit"
   },

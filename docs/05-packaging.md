@@ -70,7 +70,10 @@ dist/
 发布包内应为 `README.txt`（UTF-8 BOM）。勿用旧版 `使用说明.txt`。
 
 **杀软误报**  
-未签名便携 exe 可能被 Defender 拦截；收包人需加信任。见 TODO P6。
+未签名便携 exe 可能被 Defender 拦截；收包人需加信任。完整步骤见 **[docs/06-troubleshooting.md](./06-troubleshooting.md)**（排除项、解除锁定、收包说明）。
+
+**发布前冒烟**  
+双击 **`smoke-check.bat`**（typecheck + build + 产物校验），再按 06 文档 §3.2 做 3 分钟人工清单。
 
 **main/preload 改代码后**  
 便携包需重新 `pack.bat`；开发时改 main/preload 须完全退出再启 `Scroll.vbs`。
