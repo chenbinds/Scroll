@@ -1,32 +1,56 @@
 import { useAppStore } from '../stores/appStore'
+import { useAnnotationStore } from '../stores/annotationStore'
 import type {
   AnnotationAnchor,
   AnnotationHighlight,
   AnnotationStroke
 } from './annotationTypes'
 import { getPageBoxInScroll, getPageElement, isPageLocalAnchor } from './annotationDraw'
-import { resolveHighlightRects } from './highlightRects'
+import {
+  offsetsFromRange,
+  resolveHighlightRange
+} from './highlightRects'
+import { restoreScrollByTextOffset } from './readingAnchor'
 
-function firstNormY(
-  stroke?: AnnotationStroke,
-  highlight?: AnnotationHighlight,
-  scrollEl?: HTMLElement | null
-): number | null {
-  if (highlight && scrollEl) {
-    const rects = resolveHighlightRects(scrollEl, highlight)
-    if (rects[0]) return rects[0][1]
+function scrollRangeIntoView(scrollEl: HTMLElement, range: Range, align = 0.25): void {
+  const rect = range.getBoundingClientRect()
+  if (rect.width > 0 || rect.height > 0) {
+    const box = scrollEl.getBoundingClientRect()
+    scrollEl.scrollTo({
+      top: scrollEl.scrollTop + (rect.top - box.top) - box.height * align,
+      behavior: 'smooth'
+    })
+    return
   }
-  const fromStroke = stroke?.points?.[0]?.[1]
-  if (fromStroke != null && Number.isFinite(fromStroke)) return fromStroke
-  const fromHl = highlight?.rects?.[0]?.[1]
-  if (fromHl != null && Number.isFinite(fromHl)) return fromHl
-  return null
+  const offsets = offsetsFromRange(scrollEl, range)
+  if (offsets?.start != null) {
+    restoreScrollByTextOffset(() => scrollEl, offsets.start, { maxMs: 1500 })
+  }
 }
 
-function scrollDocToNormY(scrollEl: HTMLElement, ny: number, align = 0.25): void {
-  const docH = Math.max(1, scrollEl.scrollHeight)
-  const target = ny * docH - scrollEl.clientHeight * align
-  scrollEl.scrollTo({ top: Math.max(0, target), behavior: 'smooth' })
+function jumpToHighlight(scrollEl: HTMLElement, highlight: AnnotationHighlight): boolean {
+  const range = resolveHighlightRange(scrollEl, highlight)
+  if (!range) return false
+
+  const offsets = offsetsFromRange(scrollEl, range)
+  const st = useAppStore.getState()
+
+  if (offsets?.start != null) {
+    // Same path as bookmarks — stable at any font size
+    st.setNavigateToTextOffset(offsets.start)
+
+    // Backfill offsets for legacy marks (no textStart yet)
+    if (highlight.textStart == null && highlight.textEnd == null) {
+      useAnnotationStore.getState().updateHighlight(highlight.id, {
+        textStart: offsets.start,
+        textEnd: offsets.end
+      })
+    }
+    return true
+  }
+
+  scrollRangeIntoView(scrollEl, range)
+  return true
 }
 
 /** Jump reader to a brush stroke or text highlight. */
@@ -37,7 +61,19 @@ export function jumpToAnnotation(
 ): void {
   const st = useAppStore.getState()
   const scrollEl = st._readerEl
-  const ny = firstNormY(stroke, highlight, scrollEl)
+
+  if (highlight && scrollEl && jumpToHighlight(scrollEl, highlight)) {
+    return
+  }
+
+  const fromStroke = stroke?.points?.[0]?.[1]
+  const fromHl = highlight?.rects?.[0]?.[1]
+  const ny =
+    fromStroke != null && Number.isFinite(fromStroke)
+      ? fromStroke
+      : fromHl != null && Number.isFinite(fromHl)
+        ? fromHl
+        : null
 
   // PDF / comic: page-local coords
   if (isPageLocalAnchor(anchor) && anchor.type === 'pdf-page') {
@@ -54,16 +90,12 @@ export function jumpToAnnotation(
     return
   }
 
-  // Continuous HTML readers: document-normalized Y is precise
+  // Brush strokes: normalized document Y (best effort)
   if (scrollEl && ny != null) {
-    scrollDocToNormY(scrollEl, ny)
+    const docH = Math.max(1, scrollEl.scrollHeight)
+    const target = ny * docH - scrollEl.clientHeight * 0.25
+    scrollEl.scrollTo({ top: Math.max(0, target), behavior: 'smooth' })
     return
-  }
-
-  // Highlight quote fallback (legacy entries without rects)
-  if (scrollEl && highlight?.text?.trim()) {
-    const needle = highlight.text.trim().slice(0, 64)
-    if (scrollToPlainText(scrollEl, needle)) return
   }
 
   // Chapter start fallback
@@ -80,33 +112,9 @@ export function jumpToAnnotation(
     }
   }
 
-  // Store signals (readers without _readerEl yet)
   if (ny != null) {
     st.setNavigateToPercent(Math.min(100, Math.max(0, ny * 100)))
   } else if (anchor.chapterIndex != null) {
     st.setNavigateToSpineIndex(anchor.chapterIndex)
   }
-}
-
-function scrollToPlainText(scrollEl: HTMLElement, needle: string): boolean {
-  if (!needle) return false
-  const walker = document.createTreeWalker(scrollEl, NodeFilter.SHOW_TEXT)
-  let n: Node | null
-  while ((n = walker.nextNode())) {
-    const text = n as Text
-    const idx = text.data.indexOf(needle)
-    if (idx < 0) continue
-    try {
-      const range = document.createRange()
-      range.setStart(text, idx)
-      range.setEnd(text, Math.min(text.data.length, idx + needle.length))
-      const rect = range.getBoundingClientRect()
-      const box = scrollEl.getBoundingClientRect()
-      scrollEl.scrollTop += rect.top - box.top - box.height * 0.25
-      return true
-    } catch {
-      return false
-    }
-  }
-  return false
 }

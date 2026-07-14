@@ -47,7 +47,12 @@ interface AnnotationState {
   addStroke: (stroke: AnnotationStroke) => void
   removeStroke: (id: string) => void
   addHighlight: (hl: AnnotationHighlight) => void
-  updateHighlight: (id: string, patch: Partial<Pick<AnnotationHighlight, 'note' | 'color' | 'opacity'>>) => void
+  updateHighlight: (
+    id: string,
+    patch: Partial<
+      Pick<AnnotationHighlight, 'note' | 'color' | 'opacity' | 'textStart' | 'textEnd'>
+    >
+  ) => void
   removeHighlight: (id: string) => void
   /** Replace in-memory annotations (e.g. import) and persist */
   replaceAllAndSave: (data: {
