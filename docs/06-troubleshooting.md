@@ -88,7 +88,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-check.ps1
 | 参数 | 说明 |
 |------|------|
 | `-SkipBuild` | 跳过 build，只检查 `out/` 是否齐全 |
-| `-CheckPortable` | 额外检查 `release/Scroll.exe` 是否存在 |
+| `-CheckPortable` | 额外检查 `release/win-unpacked/Scroll.exe` 是否存在 |
 
 脚本会执行：`npm run typecheck` → `npm run build` → 校验 `out/main`、`out/preload`、`out/renderer` 关键文件。
 
@@ -96,7 +96,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-check.ps1
 
 发版或较大改动后建议走一遍：
 
-- [ ] **冷启动**：`rebuild.bat` 后 `Scroll.vbs`，或 `pack.bat` 产出之 `Scroll.exe`
+- [ ] **冷启动**：`rebuild.bat` 后 `Scroll.vbs`，或 `pack.bat` 产出文件夹内 `Scroll.exe`
 - [ ] **打开 EPUB**：滚动一段，加书签或标记+笔记，**保存**
 - [ ] **回书架**：若有未保存标注，离开弹窗正常；确认后回到书架
 - [ ] **再进同一本书**：进度大致对齐；目录可开、不白屏

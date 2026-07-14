@@ -84,16 +84,16 @@ if ($css) {
 }
 
 if ($CheckPortable) {
-    $exe = Join-Path $Root 'release/Scroll.exe'
+    $exe = Join-Path $Root 'release/win-unpacked/Scroll.exe'
     if (Test-Path $exe) {
         $sizeMb = [math]::Round((Get-Item $exe).Length / 1MB, 1)
-        if ($sizeMb -gt 30) {
-            Write-Ok "release/Scroll.exe (${sizeMb} MB)"
+        if ($sizeMb -gt 0.1) {
+            Write-Ok "release/win-unpacked/Scroll.exe (${sizeMb} MB)"
         } else {
-            Write-Warn "release/Scroll.exe exists but small (${sizeMb} MB) — repack?"
+            Write-Warn "release/win-unpacked/Scroll.exe exists but small (${sizeMb} MB) — repack?"
         }
     } else {
-        Write-Warn 'release/Scroll.exe not found — run pack.bat for portable smoke'
+        Write-Warn 'release/win-unpacked/Scroll.exe not found — run pack.bat for portable smoke'
     }
 }
 

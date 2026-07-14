@@ -9,14 +9,12 @@ files:
   - node_modules/pdfjs-dist/**/*
 win:
   target:
-    - target: portable
+    - target: dir
       arch: [x64]
   artifactName: Scroll.exe
   sign: null
   signDlls: false
   signAndEditExecutable: false
   verifyUpdateCodeSignature: false
-portable:
-  artifactName: Scroll.exe
 asar: true
 compression: maximum

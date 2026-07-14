@@ -10,9 +10,9 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "package": "electron-vite build && electron-builder --win portable",
-    "package:portable": "electron-vite build && electron-builder --win portable",
-    "pack": "electron-vite build && electron-builder --win portable",
+    "package": "electron-vite build && electron-builder --win dir",
+    "package:portable": "electron-vite build && electron-builder --win dir",
+    "pack": "electron-vite build && electron-builder --win dir",
     "smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-check.ps1",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit"

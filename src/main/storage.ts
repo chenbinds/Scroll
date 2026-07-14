@@ -2,7 +2,8 @@
  * 轻量 JSON 文件存储
  *
  * 替代 better-sqlite3，零编译依赖。
- * 数据存储在 Electron userData 目录下的 JSON 文件中。
+ * 数据存储在应用 userData 目录下的 JSON 文件中。
+ * 打包版：userData 位于 exe 旁 UserData/（见 portableData.ts）
  * 适用于 MVP 阶段的数据持久化需求。
  */
 

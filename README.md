@@ -14,7 +14,7 @@
 - **阅读主题** — 5 套主题 + 3 字体 + 全局字号（60–200%）
 - **音乐播放器** — Web Audio 内置氛围音 + URL/本地曲目
 - **中英双语** — 界面语言切换
-- **本地优先** — 数据存于本机 `userData`
+- **本地优先** — 打包版数据存于 exe 旁 `UserData/`；开发版在 AppData
 
 ## 技术栈
 
@@ -44,7 +44,7 @@
 | 用途 | 命令/文件 |
 |------|-----------|
 | 首次安装 | `install.bat` |
-| 日常启动 | `Scroll.vbs`（优先 `release/Scroll.exe`） |
+| 日常启动 | `Scroll.vbs`（优先 `release/win-unpacked/Scroll.exe`） |
 | 打包发布 | **`pack.bat`**（PowerShell 驱动；国内镜像；无需 winCodeSign） |
 | 构建（开发） | `rebuild.bat` 或 `npx electron-vite build` |
 | 发布前冒烟 | `smoke-check.bat`（见 [docs/06-troubleshooting.md](./docs/06-troubleshooting.md)） |
@@ -113,7 +113,7 @@ Scroll/
 ├── tools/offline/      # 可选：builder 离线缓存说明
 ├── Scroll.vbs          # 开发日常启动
 ├── rebuild.bat         # 构建到 out/
-├── release/Scroll.exe  # pack 中间产物（gitignore）
+├── release/win-unpacked/  # pack 中间产物（gitignore）
 └── dist/*.zip          # 最终分发包（gitignore）
 ```
 

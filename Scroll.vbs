@@ -5,7 +5,7 @@ shell.CurrentDirectory = root
 
 ' Prefer packaged exe when it is newer than last electron-vite build;
 ' otherwise use out/ so rebuild.bat results show up without re-packing.
-packaged = root & "\release\Scroll.exe"
+packaged = root & "\release\win-unpacked\Scroll.exe"
 devExe = root & "\node_modules\electron\dist\electron.exe"
 devApp = root & "\out\main\index.js"
 

@@ -104,7 +104,7 @@ function Invoke-LocalBin([string]$Name, [string[]]$CmdArgs) {
 
 Write-Host '==========================================' -ForegroundColor Yellow
 Write-Host '  Scroll - One-Click Release Pack' -ForegroundColor Yellow
-Write-Host '  Portable exe + zip for distribution' -ForegroundColor Yellow
+Write-Host '  Portable folder + zip for distribution' -ForegroundColor Yellow
 Write-Host '==========================================' -ForegroundColor Yellow
 
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
@@ -134,13 +134,20 @@ if (-not $SkipInstall -and -not (Test-Path $electronExe)) {
 Write-Step '[2/4] Building application...'
 Invoke-LocalBin 'electron-vite' @('build')
 
-Write-Step '[3/4] Packaging portable Scroll.exe (no code signing)...'
+Write-Step '[3/4] Packaging portable folder (no code signing)...'
 Write-Host '  Using npmmirror for builder binaries; winCodeSign is skipped.'
-Invoke-LocalBin 'electron-builder' @('--win', 'portable')
+# Ensure no running instance locks release\win-unpacked\Scroll.exe
+Get-Process -Name 'Scroll' -ErrorAction SilentlyContinue | ForEach-Object {
+    Write-Host '  Closing running Scroll.exe before packaging...' -ForegroundColor Yellow
+    Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+}
+Start-Sleep -Milliseconds 500
+Invoke-LocalBin 'electron-builder' @('--win', 'dir')
 
-$exePath = Join-Path $Root 'release\Scroll.exe'
+$unpackedDir = Join-Path $Root 'release\win-unpacked'
+$exePath = Join-Path $unpackedDir 'Scroll.exe'
 if (-not (Test-Path $exePath)) {
-    Write-Err '[ERROR] release\Scroll.exe not found.'
+    Write-Err '[ERROR] release\win-unpacked\Scroll.exe not found.'
     exit 1
 }
 
@@ -154,7 +161,7 @@ Write-Host ''
 Write-Host "  Send: dist\Scroll-$version-win-x64.zip"
 Write-Host "    or: dist\Scroll-$version-win-x64\"
 Write-Host ''
-Write-Host '  Recipients: unzip and run Scroll.exe (Win10/11 x64)'
+Write-Host '  Recipients: unzip folder and run Scroll.exe (Win10/11 x64)'
 Write-Host '==========================================' -ForegroundColor Green
 
 Start-Process explorer.exe (Join-Path $Root 'dist')

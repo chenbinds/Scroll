@@ -16,7 +16,7 @@
 
 | 用途 | 命令/文件 | 说明 |
 |------|-----------|------|
-| 开发日常 | `Scroll.vbs` | 优先 `release/Scroll.exe`，否则 electron + `out/` |
+| 开发日常 | `Scroll.vbs` | 优先 `release/win-unpacked/Scroll.exe`，否则 electron + `out/` |
 | 仅构建 | `rebuild.bat` | 只构建到 `out/` |
 | **分发打包** | **`pack.bat`** | 便携 exe + `dist/*.zip`（见 `docs/05-packaging.md`） |
 | 兼容入口 | `build.bat` | 转发至 `pack.bat` |
@@ -57,7 +57,7 @@ Scroll/
 ├── TODO.md
 ├── pack.bat            # 一键打包 → dist/*.zip
 ├── out/                # electron-vite 构建产物（gitignore）
-└── release/            # electron-builder 便携 exe（gitignore）
+└── release/            # electron-builder 便携文件夹 win-unpacked（gitignore）
 ```
 
 ## MOBI/AZW3
@@ -89,7 +89,7 @@ MOBI/AZW3 → foliate-js (mobi.js) → MobiReader 全量渲染
 
 ### TOC 导航：callback ref + Zustand `_readerEl`
 
-### 封面：`userData/covers/{id}.jpg`，JSON 只存 `scroll-cover://local/{id}`
+### 封面：`UserData/covers/{id}.jpg`（打包版）或 `userData/covers/`（开发），JSON 只存 `scroll-cover://local/{id}`
 
 ### 豆瓣评分
 - 主进程 `douban.ts` 代理请求
@@ -125,7 +125,7 @@ MOBI/AZW3 → foliate-js (mobi.js) → MobiReader 全量渲染
 
 ## 待实现
 
-见根目录 **`TODO.md`**（**P0 验收 → P7 搜索/锚点/导出**；P2 格式有样书再做；P6 杀软）。
+见根目录 **`TODO.md`**（**下一优先 P0 人工验收**；P7/P6 已完成；P2 格式有样书再做）。
 
 ## PowerShell
 
