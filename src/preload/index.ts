@@ -127,6 +127,9 @@ export interface ScrollAPI {
     readingTheme: unknown
     readingFont: unknown
     readerFontSize: unknown
+    readingLineHeight: unknown
+    readingParagraphGap: unknown
+    readingPageMargin: unknown
     aiConfig: unknown
   }>
   aiChat: (params: AiChatParams) => Promise<any>

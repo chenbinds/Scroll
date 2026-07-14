@@ -72,6 +72,12 @@ const en: Translations = {
   'reader.placeholder.cbz': 'CBZ/CBR — comic viewer engine',
   'reader.placeholder.djvu': 'DJVU — coming soon',
   'reader.back': 'Press Esc to return to library',
+  'reader.typography': 'Typography',
+  'reader.lineHeight': 'Line height',
+  'reader.paragraphGap': 'Paragraph gap',
+  'reader.pageMargin': 'Page margin',
+  'reader.immersive': 'Immersive mode',
+  'reader.exitImmersive': 'Exit immersive',
 
   'annotation.mark': 'Mark',
   'annotation.brush': 'Brush',

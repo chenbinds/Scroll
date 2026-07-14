@@ -41,11 +41,18 @@ body {
   color: var(--reader-text);
   font-family: var(--reader-font) !important;
   font-size: 1.125rem;
-  line-height: 1.85;
+  line-height: var(--reader-line-height, 1.85);
   font-weight: 400;
 }
 .reader-content * {
   font-family: var(--reader-font) !important;
+}
+
+.reader-page {
+  padding-left: var(--reader-page-margin, 2rem);
+  padding-right: var(--reader-page-margin, 2rem);
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
 }
 
 .dark .reader-content { background-color: var(--reader-bg); color: var(--reader-text); }
@@ -123,6 +130,28 @@ body {
   user-select: none;
   background-color: var(--reader-surface);
   border-bottom: 1px solid var(--reader-border);
+  z-index: 20;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* Immersive: tuck reader toolbar until pointer nears top of frame */
+html.reader-immersive .reader-toolbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  opacity: 0;
+  transform: translateY(-100%);
+  pointer-events: none;
+}
+html.reader-immersive .reader-frame:hover .reader-toolbar,
+html.reader-immersive .reader-toolbar:focus-within {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+html.reader-immersive .reader-frame {
+  position: relative;
 }
 
 .reader-chrome .reader-frame {
@@ -139,7 +168,7 @@ body {
   background-color: var(--reader-bg);
 }
 
-.reader-content p { margin-bottom: 1.25rem; }
+.reader-content p { margin-bottom: var(--reader-paragraph-gap, 1.25rem); }
 .reader-content h1 { font-weight: 700; font-size: 1.5rem; margin: 2.5rem 0 1.25rem; }
 .reader-content h2 { font-weight: 700; font-size: 1.25rem; margin: 2rem 0 1rem; }
 .reader-content h3 { font-weight: 600; font-size: 1.125rem; margin: 1.5rem 0 0.75rem; }

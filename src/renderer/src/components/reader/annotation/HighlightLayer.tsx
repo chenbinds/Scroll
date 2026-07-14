@@ -49,6 +49,9 @@ export default function HighlightLayer({ scrollRef, layoutKey }: Props) {
   const fontSize = useAppStore((s) => s.readerFontSize)
   const leftSidebarOpen = useAppStore((s) => s.leftSidebarOpen)
   const rightSidebarOpen = useAppStore((s) => s.rightSidebarOpen)
+  const readingLineHeight = useAppStore((s) => s.readingLineHeight)
+  const readingParagraphGap = useAppStore((s) => s.readingParagraphGap)
+  const readingPageMargin = useAppStore((s) => s.readingPageMargin)
 
   const highlightsRef = useRef(highlights)
   highlightsRef.current = highlights
@@ -100,7 +103,7 @@ export default function HighlightLayer({ scrollRef, layoutKey }: Props) {
       clearTimeout(t2)
       clearTimeout(t3)
     }
-  }, [highlights, fontSize, layoutKey, leftSidebarOpen, rightSidebarOpen, redraw])
+  }, [highlights, fontSize, layoutKey, leftSidebarOpen, rightSidebarOpen, readingLineHeight, readingParagraphGap, readingPageMargin, redraw])
 
   // Preview must not block first selection (mouseup → popup)
   useEffect(() => {

@@ -63,6 +63,20 @@ interface AppState {
   readerFontSize: number
   setReaderFontSize: (size: number) => void
 
+  /** Line height multiplier for continuous readers (default 1.85) */
+  readingLineHeight: number
+  setReadingLineHeight: (v: number) => void
+  /** Paragraph bottom margin in rem (default 1.25) */
+  readingParagraphGap: number
+  setReadingParagraphGap: (v: number) => void
+  /** Horizontal page padding in rem (default 2) */
+  readingPageMargin: number
+  setReadingPageMargin: (v: number) => void
+  /** Hide top bar / reader chrome for immersion */
+  readerImmersive: boolean
+  setReaderImmersive: (v: boolean) => void
+  toggleReaderImmersive: () => void
+
   // Current book
   currentBook: Book | null
   openBook: (book: Book) => void
@@ -207,6 +221,22 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   readerFontSize: 100,
   setReaderFontSize: (size) => set({ readerFontSize: Math.min(200, Math.max(60, Math.round(size))) }),
+
+  readingLineHeight: 1.85,
+  setReadingLineHeight: (v) =>
+    set({ readingLineHeight: Math.min(2.6, Math.max(1.3, Math.round(v * 100) / 100)) }),
+
+  readingParagraphGap: 1.25,
+  setReadingParagraphGap: (v) =>
+    set({ readingParagraphGap: Math.min(2.5, Math.max(0.5, Math.round(v * 100) / 100)) }),
+
+  readingPageMargin: 2,
+  setReadingPageMargin: (v) =>
+    set({ readingPageMargin: Math.min(4, Math.max(0.75, Math.round(v * 100) / 100)) }),
+
+  readerImmersive: false,
+  setReaderImmersive: (v) => set({ readerImmersive: v }),
+  toggleReaderImmersive: () => set((s) => ({ readerImmersive: !s.readerImmersive })),
 
   currentBook: null,
   openBook: (book) => {

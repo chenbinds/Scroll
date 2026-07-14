@@ -15,6 +15,7 @@ export default function AppShell({ children, onOpenSettings }: Props) {
   const leftSidebarOpen = useAppStore((s) => s.leftSidebarOpen)
   const rightSidebarOpen = useAppStore((s) => s.rightSidebarOpen)
   const currentView = useAppStore((s) => s.currentView)
+  const readerImmersive = useAppStore((s) => s.readerImmersive)
   const requestAiPanel = useAppStore((s) => s.requestAiPanel)
   const setRequestAiPanel = useAppStore((s) => s.setRequestAiPanel)
   const toggleRightSidebar = useAppStore((s) => s.toggleRightSidebar)
@@ -38,9 +39,27 @@ export default function AppShell({ children, onOpenSettings }: Props) {
     return () => clearTimeout(t)
   }, [])
 
+  useEffect(() => {
+    document.documentElement.classList.toggle(
+      'reader-immersive',
+      currentView === 'reader' && readerImmersive
+    )
+    return () => document.documentElement.classList.remove('reader-immersive')
+  }, [currentView, readerImmersive])
+
+  // Entering immersive: collapse sidebars for a clean frame
+  useEffect(() => {
+    if (currentView !== 'reader' || !readerImmersive) return
+    const st = useAppStore.getState()
+    if (st.leftSidebarOpen) st.toggleLeftSidebar(st.leftSidebarTab)
+    if (st.rightSidebarOpen) st.toggleRightSidebar()
+  }, [readerImmersive, currentView])
+
+  const hideChrome = currentView === 'reader' && readerImmersive
+
   return (
     <div className={`h-screen flex flex-col transition-colors ${currentView === 'reader' ? 'reader-chrome' : 'bg-slate-50 dark:bg-gray-950'}`}>
-      <TopBar onOpenSettings={onOpenSettings} />
+      {!hideChrome && <TopBar onOpenSettings={onOpenSettings} />}
 
       <div className="flex-1 flex overflow-hidden">
         {currentView === 'reader' && leftSidebarOpen && (

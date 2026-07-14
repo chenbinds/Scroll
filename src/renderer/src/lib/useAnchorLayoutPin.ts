@@ -3,7 +3,7 @@ import { useAppStore } from '../stores/appStore'
 import { restoreScrollByTextOffset } from './readingAnchor'
 
 /**
- * Re-pin scroll to last text offset when font size or sidebars change layout.
+ * Re-pin scroll to last text offset when font size, typography, or sidebars change layout.
  * Also handles navigateToTextOffset jumps (bookmarks).
  */
 export function useAnchorLayoutPin(
@@ -18,6 +18,9 @@ export function useAnchorLayoutPin(
   const { ready, fontSize, lastTextOffsetRef, restoringRef } = options
   const leftSidebarOpen = useAppStore((s) => s.leftSidebarOpen)
   const rightSidebarOpen = useAppStore((s) => s.rightSidebarOpen)
+  const readingLineHeight = useAppStore((s) => s.readingLineHeight)
+  const readingParagraphGap = useAppStore((s) => s.readingParagraphGap)
+  const readingPageMargin = useAppStore((s) => s.readingPageMargin)
   const skipFirstLayoutRef = useRef(true)
 
   useEffect(() => {
@@ -38,7 +41,18 @@ export function useAnchorLayoutPin(
       clearTimeout(t)
       restoringRef.current = false
     }
-  }, [ready, fontSize, leftSidebarOpen, rightSidebarOpen, contentRef, lastTextOffsetRef, restoringRef])
+  }, [
+    ready,
+    fontSize,
+    leftSidebarOpen,
+    rightSidebarOpen,
+    readingLineHeight,
+    readingParagraphGap,
+    readingPageMargin,
+    contentRef,
+    lastTextOffsetRef,
+    restoringRef
+  ])
 
   const navigateToTextOffset = useAppStore((s) => s.navigateToTextOffset)
   const setNavigateToTextOffset = useAppStore((s) => s.setNavigateToTextOffset)

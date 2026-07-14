@@ -75,6 +75,12 @@ const zh = {
   'reader.placeholder.cbz': 'CBZ/CBR — 漫画浏览引擎',
   'reader.placeholder.djvu': 'DJVU — 待实现',
   'reader.back': '按 Esc 返回书架',
+  'reader.typography': '排版',
+  'reader.lineHeight': '行距',
+  'reader.paragraphGap': '段距',
+  'reader.pageMargin': '页边距',
+  'reader.immersive': '沉浸阅读',
+  'reader.exitImmersive': '退出沉浸',
 
   // Annotation
   'annotation.mark': '标记',

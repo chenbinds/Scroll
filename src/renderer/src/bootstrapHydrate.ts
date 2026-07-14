@@ -33,6 +33,9 @@ export async function hydrateFromBootstrap(): Promise<void> {
     }
     if (typeof data.readingFont === 'string') st.setReadingFont(data.readingFont as Parameters<typeof st.setReadingFont>[0])
     if (typeof data.readerFontSize === 'number') st.setReaderFontSize(data.readerFontSize)
+    if (typeof data.readingLineHeight === 'number') st.setReadingLineHeight(data.readingLineHeight)
+    if (typeof data.readingParagraphGap === 'number') st.setReadingParagraphGap(data.readingParagraphGap)
+    if (typeof data.readingPageMargin === 'number') st.setReadingPageMargin(data.readingPageMargin)
     if (data.aiConfig) st.setAiConfig(data.aiConfig as Parameters<typeof st.setAiConfig>[0])
     hydrated = true
   } catch (err) {

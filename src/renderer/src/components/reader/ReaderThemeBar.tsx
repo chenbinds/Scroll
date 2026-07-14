@@ -1,6 +1,7 @@
 import { useAppStore } from '../../stores/appStore'
 import { FONTS, type FontKey } from '../../lib/readingTheme'
 import ThemeSelect from './ThemeSelect'
+import TypographyPanel from './TypographyPanel'
 
 export default function ReaderThemeBar() {
   const { readingFont, setReadingFont } = useAppStore()
@@ -20,6 +21,8 @@ export default function ReaderThemeBar() {
           <option key={key} value={key}>{FONTS[key].name}</option>
         ))}
       </select>
+      <span className="chrome-divider" />
+      <TypographyPanel />
     </div>
   )
 }

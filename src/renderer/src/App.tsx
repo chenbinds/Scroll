@@ -87,13 +87,19 @@ export default function App() {
 
   const readingTheme = useAppStore((s) => s.readingTheme)
   const readingFont = useAppStore((s) => s.readingFont)
+  const readingLineHeight = useAppStore((s) => s.readingLineHeight)
+  const readingParagraphGap = useAppStore((s) => s.readingParagraphGap)
+  const readingPageMargin = useAppStore((s) => s.readingPageMargin)
   useEffect(() => {
     const vars = getThemeCssVars(readingTheme, readingFont)
     const root = document.documentElement
     for (const [key, value] of Object.entries(vars)) {
       root.style.setProperty(key, value)
     }
-  }, [readingTheme, readingFont])
+    root.style.setProperty('--reader-line-height', String(readingLineHeight))
+    root.style.setProperty('--reader-paragraph-gap', `${readingParagraphGap}rem`)
+    root.style.setProperty('--reader-page-margin', `${readingPageMargin}rem`)
+  }, [readingTheme, readingFont, readingLineHeight, readingParagraphGap, readingPageMargin])
 
   // Fallback bootstrap if hydrate ran before scrollAPI (HMR / edge cases)
   useEffect(() => {
@@ -118,6 +124,9 @@ export default function App() {
       else if (typeof data.darkMode === 'boolean') st.setDarkMode(data.darkMode)
       if (typeof data.readingFont === 'string') st.setReadingFont(data.readingFont as any)
       if (typeof data.readerFontSize === 'number') st.setReaderFontSize(data.readerFontSize)
+      if (typeof data.readingLineHeight === 'number') st.setReadingLineHeight(data.readingLineHeight)
+      if (typeof data.readingParagraphGap === 'number') st.setReadingParagraphGap(data.readingParagraphGap)
+      if (typeof data.readingPageMargin === 'number') st.setReadingPageMargin(data.readingPageMargin)
       if (data.aiConfig) st.setAiConfig(data.aiConfig as any)
       setLibraryReady(true)
       console.log(`[scroll] renderer bootstrap done in ${(performance.now() - t0).toFixed(0)}ms`)
@@ -174,6 +183,21 @@ export default function App() {
   }, [readingFont, libraryReady])
 
   useEffect(() => {
+    if (!libraryReady) return
+    window.scrollAPI.storage.set('readingLineHeight', readingLineHeight).catch(() => {})
+  }, [readingLineHeight, libraryReady])
+
+  useEffect(() => {
+    if (!libraryReady) return
+    window.scrollAPI.storage.set('readingParagraphGap', readingParagraphGap).catch(() => {})
+  }, [readingParagraphGap, libraryReady])
+
+  useEffect(() => {
+    if (!libraryReady) return
+    window.scrollAPI.storage.set('readingPageMargin', readingPageMargin).catch(() => {})
+  }, [readingPageMargin, libraryReady])
+
+  useEffect(() => {
     if (!currentBook) return
     const format = currentBook.format.toUpperCase()
     if (!TOC_FORMATS.has(format)) {
@@ -181,6 +205,13 @@ export default function App() {
       if (st.leftSidebarOpen) st.toggleLeftSidebar(st.leftSidebarTab)
     }
   }, [currentBook])
+
+  // Leave immersive when leaving reader
+  useEffect(() => {
+    if (currentView !== 'reader') {
+      useAppStore.getState().setReaderImmersive(false)
+    }
+  }, [currentView])
 
   useEffect(() => {
     if (currentView !== 'reader' || !currentBook) return
@@ -208,6 +239,11 @@ export default function App() {
       }
       if (e.key === 'Escape' && currentView === 'reader') {
         e.preventDefault()
+        const app = useAppStore.getState()
+        if (app.readerImmersive) {
+          app.setReaderImmersive(false)
+          return
+        }
         const store = useAnnotationStore.getState()
         // Leave dialog open → Esc cancels (same as 取消)
         if (store.pendingLeave) {

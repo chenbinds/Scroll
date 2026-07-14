@@ -410,7 +410,7 @@ export default function EpubReader({
           )}
 
           {!loading && !error && chapterElements && (
-            <div className="max-w-4xl mx-auto px-8 py-6 reader-content" style={{ fontSize: `${fontSize}%` }}>
+            <div className="max-w-4xl mx-auto reader-page reader-content" style={{ fontSize: `${fontSize}%` }}>
               <h1 className="text-2xl font-bold mb-2 text-center">{title}</h1>
               {author && author !== 'Unknown Author' && (
                 <p className="text-sm text-center chrome-muted mb-8">{author}</p>

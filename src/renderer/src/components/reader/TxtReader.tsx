@@ -281,7 +281,7 @@ export default function TxtReader({
             </div>
           )}
           {!loading && !error && (
-            <div className="max-w-4xl mx-auto px-8 py-6 reader-content" style={{ fontSize: `${fontSize}%` }}>
+            <div className="max-w-4xl mx-auto reader-page reader-content" style={{ fontSize: `${fontSize}%` }}>
               <h1 className="text-2xl font-bold mb-8 text-center">{title}</h1>
               {chapters.map((ch, i) => (
                 <section key={i} data-chapter={i} data-href={`chapter-${i}`} className="mb-8">

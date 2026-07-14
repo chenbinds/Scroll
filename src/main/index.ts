@@ -376,6 +376,9 @@ ipcMain.handle('app:bootstrap', async () => {
     readingTheme: settingsStore.get('readingTheme', 'light'),
     readingFont: settingsStore.get('readingFont', 'system'),
     readerFontSize: settingsStore.get('readerFontSize', 100),
+    readingLineHeight: settingsStore.get('readingLineHeight', 1.85),
+    readingParagraphGap: settingsStore.get('readingParagraphGap', 1.25),
+    readingPageMargin: settingsStore.get('readingPageMargin', 2),
     aiConfig: settingsStore.get('aiConfig', null)
   }
   console.log(`[scroll] bootstrap +${Date.now() - bootStarted}ms (handler ${Date.now() - t0}ms)`)
