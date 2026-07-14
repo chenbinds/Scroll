@@ -289,6 +289,22 @@ export default function MobiReader({
     return () => { stop(); clearTimeout(t); restoringRef.current = false }
   }, [navigateToPercent, setNavigateToPercent])
 
+  const navigateToSpineIndex = useAppStore((s) => s.navigateToSpineIndex)
+  const setNavigateToSpineIndex = useAppStore((s) => s.setNavigateToSpineIndex)
+  useEffect(() => {
+    if (navigateToSpineIndex === null || !contentRef.current) return
+    const el = contentRef.current.querySelector(
+      `[data-chapter="${navigateToSpineIndex}"]`
+    ) as HTMLElement | null
+    if (el) {
+      const container = contentRef.current
+      const containerRect = container.getBoundingClientRect()
+      const elRect = el.getBoundingClientRect()
+      container.scrollTop += elRect.top - containerRect.top - 80
+    }
+    setNavigateToSpineIndex(null)
+  }, [navigateToSpineIndex, setNavigateToSpineIndex])
+
   // Keyboard
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {

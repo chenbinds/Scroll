@@ -4,35 +4,14 @@ import { useAppStore } from '../../stores/appStore'
 import { useAnnotationStore } from '../../stores/annotationStore'
 import { useI18n } from '../../lib/i18n'
 import { annotationFormatForBook } from '../../lib/annotationTypes'
-import type { AnnotationAnchor, AnnotationHighlight, AnnotationStroke } from '../../lib/annotationTypes'
+import type { AnnotationHighlight, AnnotationStroke } from '../../lib/annotationTypes'
 import {
   buildAnnotationsMarkdown,
   buildExportBundle,
   defaultExportFileName,
   parseAnnotationsImport
 } from '../../lib/annotationExport'
-
-function jumpToAnchor(
-  anchor: AnnotationAnchor,
-  stroke?: AnnotationStroke,
-  highlight?: AnnotationHighlight
-): void {
-  const st = useAppStore.getState()
-  if (anchor.type === 'pdf-page') {
-    st.setNavigateToPage(anchor.pageNum)
-    return
-  }
-  if (anchor.chapterIndex != null) {
-    st.setNavigateToSpineIndex(anchor.chapterIndex)
-    return
-  }
-  const y =
-    stroke?.points[0]?.[1] ??
-    highlight?.rects[0]?.[1]
-  if (y != null) {
-    st.setNavigateToPercent(Math.round(y * 100))
-  }
-}
+import { jumpToAnnotation } from '../../lib/jumpToAnnotation'
 
 export default function BookmarkPanel() {
   const { t } = useI18n()
@@ -276,10 +255,11 @@ export default function BookmarkPanel() {
             </div>
             {highlights.map((hl) => (
               <div key={hl.id}
+                onClick={() => jumpToAnnotation(hl.anchor, undefined, hl)}
                 className="flex items-start gap-2 px-3 py-2 border-b border-gray-100 dark:border-gray-800/50
-                           hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors group">
+                           hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors group cursor-pointer">
                 <Highlighter size={14} className="text-yellow-600 shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => jumpToAnchor(hl.anchor, undefined, hl)}>
+                <div className="flex-1 min-w-0">
                   <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{highlightLabel(hl)}</p>
                   {hl.note && (
                     <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mt-0.5">{hl.note}</p>
@@ -289,7 +269,10 @@ export default function BookmarkPanel() {
                 {(hl.text || hl.note) && (
                   <button
                     type="button"
-                    onClick={() => askAiAbout(hl.note || hl.text || '')}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      askAiAbout(hl.note || hl.text || '')
+                    }}
                     className="text-[10px] text-scroll-500 hover:underline opacity-0 group-hover:opacity-100 shrink-0"
                   >
                     AI
@@ -299,7 +282,7 @@ export default function BookmarkPanel() {
             ))}
             {strokes.map((st) => (
               <div key={st.id}
-                onClick={() => jumpToAnchor(st.anchor, st)}
+                onClick={() => jumpToAnnotation(st.anchor, st)}
                 className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-gray-800/50
                            hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors cursor-pointer group">
                 <PenLine size={14} className="shrink-0" style={{ color: st.color }} />
