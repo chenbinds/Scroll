@@ -5,11 +5,17 @@ import type {
   AnnotationStroke
 } from './annotationTypes'
 import { getPageBoxInScroll, getPageElement, isPageLocalAnchor } from './annotationDraw'
+import { resolveHighlightRects } from './highlightRects'
 
 function firstNormY(
   stroke?: AnnotationStroke,
-  highlight?: AnnotationHighlight
+  highlight?: AnnotationHighlight,
+  scrollEl?: HTMLElement | null
 ): number | null {
+  if (highlight && scrollEl) {
+    const rects = resolveHighlightRects(scrollEl, highlight)
+    if (rects[0]) return rects[0][1]
+  }
   const fromStroke = stroke?.points?.[0]?.[1]
   if (fromStroke != null && Number.isFinite(fromStroke)) return fromStroke
   const fromHl = highlight?.rects?.[0]?.[1]
@@ -31,7 +37,7 @@ export function jumpToAnnotation(
 ): void {
   const st = useAppStore.getState()
   const scrollEl = st._readerEl
-  const ny = firstNormY(stroke, highlight)
+  const ny = firstNormY(stroke, highlight, scrollEl)
 
   // PDF / comic: page-local coords
   if (isPageLocalAnchor(anchor) && anchor.type === 'pdf-page') {

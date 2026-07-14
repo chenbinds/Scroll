@@ -3,7 +3,7 @@ import { Check, X } from 'lucide-react'
 import { useAnnotationStore } from '../../../stores/annotationStore'
 import { useAppStore } from '../../../stores/appStore'
 import { useI18n } from '../../../lib/i18n'
-import { selectionToNormRects } from './HighlightLayer'
+import { selectionToNormRects, offsetsFromRange, resolveHighlightRects } from '../../../lib/highlightRects'
 import type { AnnotationHighlight, EpubAnchor, NormRect } from '../../../lib/annotationTypes'
 
 interface Props {
@@ -16,6 +16,8 @@ interface NotePopupState {
   highlightId?: string
   rects: NormRect[]
   text: string
+  textStart?: number
+  textEnd?: number
   anchor: EpubAnchor
   color: string
   opacity: number
@@ -127,11 +129,13 @@ function clientToDocNormalized(
 function hitHighlightAt(
   nx: number,
   ny: number,
-  highlights: AnnotationHighlight[]
+  highlights: AnnotationHighlight[],
+  scrollEl: HTMLElement
 ): AnnotationHighlight | null {
   for (let i = highlights.length - 1; i >= 0; i--) {
     const hl = highlights[i]
-    for (const [rx, ry, rw, rh] of hl.rects) {
+    const rects = resolveHighlightRects(scrollEl, hl)
+    for (const [rx, ry, rw, rh] of rects) {
       if (nx >= rx && nx <= rx + rw && ny >= ry && ny <= ry + rh) return hl
     }
   }
@@ -204,7 +208,7 @@ export default function MarkSelectionHandler({ scrollRef }: Props) {
         // Click (no drag): open existing highlight note
         if (!moved && !hasSelection) {
           const [nx, ny] = clientToDocNormalized(e.clientX, e.clientY, scrollEl)
-          const hit = hitHighlightAt(nx, ny, highlightsRef.current)
+          const hit = hitHighlightAt(nx, ny, highlightsRef.current, scrollEl)
           if (!hit) return
           const pos = popupPosNearClient(e.clientX, e.clientY)
           setPopup({
@@ -212,6 +216,8 @@ export default function MarkSelectionHandler({ scrollRef }: Props) {
             highlightId: hit.id,
             rects: hit.rects,
             text: hit.text || '',
+            textStart: hit.textStart,
+            textEnd: hit.textEnd,
             anchor: hit.anchor,
             color: hit.color,
             opacity: hit.opacity,
@@ -231,7 +237,13 @@ export default function MarkSelectionHandler({ scrollRef }: Props) {
         const rects = selectionToNormRects(scrollEl, range)
         if (rects.length === 0) return
 
-        if (selectionOverlapsExisting(rects, highlightsRef.current)) {
+        if (selectionOverlapsExisting(
+          rects,
+          highlightsRef.current.map((hl) => ({
+            ...hl,
+            rects: resolveHighlightRects(scrollEl, hl)
+          }))
+        )) {
           setOverlapHint(true)
           window.setTimeout(() => setOverlapHint(false), 1800)
           sel.removeAllRanges()
@@ -239,6 +251,7 @@ export default function MarkSelectionHandler({ scrollRef }: Props) {
         }
 
         const text = sel.toString().trim().slice(0, 500)
+        const offsets = offsetsFromRange(scrollEl, range)
         const rangeBox = range.getBoundingClientRect()
         const preferBelow = rangeBox.bottom + POPUP_HEIGHT_EST + 8 < window.innerHeight
         const pos = preferBelow
@@ -253,6 +266,8 @@ export default function MarkSelectionHandler({ scrollRef }: Props) {
           mode: 'create',
           rects,
           text,
+          textStart: offsets?.start,
+          textEnd: offsets?.end,
           anchor,
           color,
           opacity,
@@ -288,6 +303,8 @@ export default function MarkSelectionHandler({ scrollRef }: Props) {
         opacity: popup.opacity,
         rects: popup.rects,
         text: popup.text || undefined,
+        textStart: popup.textStart,
+        textEnd: popup.textEnd,
         note: noteText,
         anchor: popup.anchor,
         createdAt: Date.now()

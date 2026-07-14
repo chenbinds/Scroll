@@ -2,26 +2,42 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { useAnnotationStore } from '../../../stores/annotationStore'
 import { useAppStore } from '../../../stores/appStore'
 import type { AnnotationHighlight, NormRect } from '../../../lib/annotationTypes'
+import { resolveHighlightRects, selectionToNormRects } from '../../../lib/highlightRects'
+
+export { selectionToNormRects }
 
 interface Props {
   scrollRef: React.RefObject<HTMLDivElement | null>
   layoutKey?: string | number
 }
 
+function drawNormRects(
+  ctx: CanvasRenderingContext2D,
+  rects: NormRect[],
+  color: string,
+  opacity: number,
+  docW: number,
+  docH: number
+): void {
+  ctx.save()
+  ctx.fillStyle = color
+  ctx.globalAlpha = opacity / 100
+  for (const [nx, ny, nw, nh] of rects) {
+    ctx.fillRect(nx * docW, ny * docH, nw * docW, nh * docH)
+  }
+  ctx.restore()
+}
+
 function drawHighlights(
   ctx: CanvasRenderingContext2D,
+  scrollEl: HTMLElement,
   highlights: AnnotationHighlight[],
   docW: number,
   docH: number
 ): void {
   for (const hl of highlights) {
-    ctx.save()
-    ctx.fillStyle = hl.color
-    ctx.globalAlpha = hl.opacity / 100
-    for (const [nx, ny, nw, nh] of hl.rects) {
-      ctx.fillRect(nx * docW, ny * docH, nw * docW, nh * docH)
-    }
-    ctx.restore()
+    const rects = resolveHighlightRects(scrollEl, hl)
+    drawNormRects(ctx, rects, hl.color, hl.opacity, docW, docH)
   }
 }
 
@@ -31,6 +47,8 @@ export default function HighlightLayer({ scrollRef, layoutKey }: Props) {
   const highlights = useAnnotationStore((s) => s.highlights)
   const previewMark = useAnnotationStore((s) => s.previewMark)
   const fontSize = useAppStore((s) => s.readerFontSize)
+  const leftSidebarOpen = useAppStore((s) => s.leftSidebarOpen)
+  const rightSidebarOpen = useAppStore((s) => s.rightSidebarOpen)
 
   const highlightsRef = useRef(highlights)
   highlightsRef.current = highlights
@@ -63,32 +81,26 @@ export default function HighlightLayer({ scrollRef, layoutKey }: Props) {
     const docH = Math.max(1, scrollEl.scrollHeight)
     ctx.save()
     ctx.translate(-scrollEl.scrollLeft, -scrollEl.scrollTop)
-    drawHighlights(ctx, highlightsRef.current, docW, docH)
+    drawHighlights(ctx, scrollEl, highlightsRef.current, docW, docH)
     const preview = previewRef.current
     if (preview) {
-      drawHighlights(
-        ctx,
-        [
-          {
-            id: '__preview__',
-            tool: 'mark',
-            color: preview.color,
-            opacity: preview.opacity,
-            rects: preview.rects,
-            anchor: { type: 'document' },
-            createdAt: 0
-          }
-        ],
-        docW,
-        docH
-      )
+      drawNormRects(ctx, preview.rects, preview.color, preview.opacity, docW, docH)
     }
     ctx.restore()
   }, [scrollRef])
 
   useLayoutEffect(() => {
+    // Layout may still settle after font/sidebar change — redraw a few times
     redraw()
-  }, [highlights, fontSize, layoutKey, redraw])
+    const t1 = window.setTimeout(redraw, 50)
+    const t2 = window.setTimeout(redraw, 200)
+    const t3 = window.setTimeout(redraw, 500)
+    return () => {
+      clearTimeout(t1)
+      clearTimeout(t2)
+      clearTimeout(t3)
+    }
+  }, [highlights, fontSize, layoutKey, leftSidebarOpen, rightSidebarOpen, redraw])
 
   // Preview must not block first selection (mouseup → popup)
   useEffect(() => {
@@ -160,30 +172,4 @@ export default function HighlightLayer({ scrollRef, layoutKey }: Props) {
       style={{ pointerEvents: 'none', background: 'transparent' }}
     />
   )
-}
-
-/** Convert Selection client rects → document-normalized rects */
-export function selectionToNormRects(
-  scrollEl: HTMLElement,
-  range: Range
-): NormRect[] {
-  const scrollRect = scrollEl.getBoundingClientRect()
-  const docW = Math.max(1, scrollEl.scrollWidth)
-  const docH = Math.max(1, scrollEl.scrollHeight)
-  const clientRects = Array.from(range.getClientRects())
-  const out: NormRect[] = []
-  for (const r of clientRects) {
-    if (r.width < 1 || r.height < 1) continue
-    const x = (scrollEl.scrollLeft + (r.left - scrollRect.left)) / docW
-    const y = (scrollEl.scrollTop + (r.top - scrollRect.top)) / docH
-    const w = r.width / docW
-    const h = r.height / docH
-    out.push([
-      Math.max(0, Math.min(1, x)),
-      Math.max(0, Math.min(1, y)),
-      Math.max(0, Math.min(1, w)),
-      Math.max(0, Math.min(1, h))
-    ])
-  }
-  return out
 }

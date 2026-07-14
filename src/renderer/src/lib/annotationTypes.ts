@@ -48,6 +48,9 @@ export interface AnnotationHighlight {
   rects: NormRect[]
   /** Selected quote (snippet) */
   text?: string
+  /** Absolute char offsets in scroll root — survive font / sidebar reflow */
+  textStart?: number
+  textEnd?: number
   /** User note attached to this mark */
   note?: string
   anchor: AnnotationAnchor
