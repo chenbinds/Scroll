@@ -245,9 +245,15 @@ export default function App() {
         return <EpubReader filePath={currentBook.path} onClose={() => setCurrentView('library')}
           initialChapterIndex={currentBook.currentPage || 0}
           initialProgress={currentBook.progress || undefined}
-          onProgress={(chapterIndex, _count, progress) => {
-            updateBookProgress(currentBook.id, progress, chapterIndex)
-            useAppStore.getState().setReadingPosition({ chapter: String(chapterIndex), page: chapterIndex, percent: Math.round(progress) })
+          initialTextOffset={currentBook.progressOffset}
+          onProgress={(chapterIndex, _count, progress, textOffset) => {
+            updateBookProgress(currentBook.id, progress, chapterIndex, textOffset)
+            useAppStore.getState().setReadingPosition({
+              chapter: String(chapterIndex),
+              page: chapterIndex,
+              percent: Math.round(progress),
+              textOffset
+            })
           }}
           onTocReady={(toc) => { useAppStore.getState().setToc(toc) }} />
 
@@ -256,9 +262,10 @@ export default function App() {
       case 'MARKDOWN':
         return <TxtReader filePath={currentBook.path} onClose={() => setCurrentView('library')}
           initialProgress={currentBook.progress || undefined}
-          onProgress={(pct) => {
-            updateBookProgress(currentBook.id, pct, 0)
-            useAppStore.getState().setReadingPosition({ percent: Math.round(pct) })
+          initialTextOffset={currentBook.progressOffset}
+          onProgress={(pct, textOffset) => {
+            updateBookProgress(currentBook.id, pct, 0, textOffset)
+            useAppStore.getState().setReadingPosition({ percent: Math.round(pct), textOffset })
           }} />
 
       case 'MOBI':
@@ -266,9 +273,15 @@ export default function App() {
       case 'AZW3':
         return <MobiReader filePath={currentBook.path} onClose={() => setCurrentView('library')}
           initialProgress={currentBook.progress || undefined}
-          onProgress={(chapterIndex, _count, progress) => {
-            updateBookProgress(currentBook.id, progress, chapterIndex)
-            useAppStore.getState().setReadingPosition({ chapter: String(chapterIndex), page: chapterIndex, percent: Math.round(progress) })
+          initialTextOffset={currentBook.progressOffset}
+          onProgress={(chapterIndex, _count, progress, textOffset) => {
+            updateBookProgress(currentBook.id, progress, chapterIndex, textOffset)
+            useAppStore.getState().setReadingPosition({
+              chapter: String(chapterIndex),
+              page: chapterIndex,
+              percent: Math.round(progress),
+              textOffset
+            })
           }}
           onTocReady={(toc) => { useAppStore.getState().setToc(toc) }}
           />

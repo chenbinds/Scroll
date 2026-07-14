@@ -14,21 +14,37 @@ import { useAnnotationStore } from '../../stores/annotationStore'
 import { annotationFormatForBook } from '../../lib/annotationTypes'
 import { shouldIgnoreReaderShortcut } from '../../lib/readerShortcuts'
 import { readScrollPercent, restoreScrollPercent } from '../../lib/scrollProgress'
+import { readTextOffsetAtView, restoreScrollByTextOffset } from '../../lib/readingAnchor'
+import { useAnchorLayoutPin } from '../../lib/useAnchorLayoutPin'
 import { stripHtmlToPlain, buildTitleAnchors, flattenToc } from '../../lib/bookSearch'
 import { useSearchHitNavigation } from '../../lib/useSearchHitNavigation'
 
 interface Props {
   filePath: string
   onClose: () => void
-  onProgress?: (chapterIndex: number, chapterCount: number, percent: number) => void
+  onProgress?: (
+    chapterIndex: number,
+    chapterCount: number,
+    percent: number,
+    textOffset?: number
+  ) => void
   onTocReady?: (toc: TocItem[]) => void
   initialChapterIndex?: number
   initialProgress?: number
+  initialTextOffset?: number
 }
 
 export type { TocItem }
 
-export default function EpubReader({ filePath, onClose, onProgress, onTocReady, initialChapterIndex, initialProgress }: Props) {
+export default function EpubReader({
+  filePath,
+  onClose,
+  onProgress,
+  onTocReady,
+  initialChapterIndex,
+  initialProgress,
+  initialTextOffset
+}: Props) {
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
   const [loading, setLoading] = useState(true)
@@ -38,6 +54,9 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
   const contentRef = useRef<HTMLDivElement | null>(null)
   const hasRestoredRef = useRef(false)
   const restoringRef = useRef(false)
+  const lastTextOffsetRef = useRef<number | null>(
+    initialTextOffset != null && initialTextOffset >= 0 ? initialTextOffset : null
+  )
   const currentBook = useAppStore((s) => s.currentBook)
 
   // Callback ref: stores the DOM element in Zustand for TocPanel to use
@@ -71,6 +90,8 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
     const el = contentRef.current
     if (!el || !epubContent) return
     const pct = readScrollPercent(el)
+    const textOffset = readTextOffsetAtView(el)
+    lastTextOffsetRef.current = textOffset
     let currentIdx = 0
     const chapters = el.querySelectorAll('[data-chapter]')
     const containerRect = el.getBoundingClientRect()
@@ -80,7 +101,7 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
       if (rect.top <= viewTop) currentIdx = Number((ch as HTMLElement).dataset.chapter) || 0
       else break
     }
-    onProgress?.(currentIdx, epubContent.spine.length, pct)
+    onProgress?.(currentIdx, epubContent.spine.length, pct, textOffset)
   }, [epubContent, onProgress])
 
   const flushProgressRef = useRef(flushProgress)
@@ -189,18 +210,26 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
     useAppStore.getState().setSearchChapters(chapters)
   }, [epubContent])
 
-  // Restore reading position (high precision + re-apply while layout settles)
+  // Restore reading position (text offset preferred; percent / chapter fallback)
   useEffect(() => {
     if (!epubContent || hasRestoredRef.current) return
 
+    const hasOffset = initialTextOffset != null && initialTextOffset >= 0
     const pct = initialProgress && initialProgress > 0 && initialProgress < 100 ? initialProgress : null
-    if (!pct && !(initialChapterIndex && initialChapterIndex > 0)) {
+    if (!hasOffset && !pct && !(initialChapterIndex && initialChapterIndex > 0)) {
       hasRestoredRef.current = true
       return
     }
 
     hasRestoredRef.current = true
     restoringRef.current = true
+
+    if (hasOffset) {
+      lastTextOffsetRef.current = initialTextOffset!
+      const stop = restoreScrollByTextOffset(() => contentRef.current, initialTextOffset!)
+      const doneTimer = setTimeout(() => { restoringRef.current = false }, 4200)
+      return () => { stop(); clearTimeout(doneTimer); restoringRef.current = false }
+    }
 
     if (pct) {
       const stop = restoreScrollPercent(() => contentRef.current, pct)
@@ -231,7 +260,14 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
     }
     setTimeout(() => tryChapter(0), 100)
     return () => { cancelled = true; restoringRef.current = false }
-  }, [epubContent, initialChapterIndex, initialProgress])
+  }, [epubContent, initialChapterIndex, initialProgress, initialTextOffset])
+
+  useAnchorLayoutPin(contentRef, {
+    ready: !!epubContent,
+    fontSize,
+    lastTextOffsetRef,
+    restoringRef
+  })
 
   // Flush only on true unmount — do NOT depend on flushProgress identity
   // (parent passes a new onProgress every render; cleanup would infinite-loop)
@@ -248,6 +284,8 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
     const update = () => {
       if (restoringRef.current) return
       const pct = readScrollPercent(el)
+      const textOffset = readTextOffsetAtView(el)
+      lastTextOffsetRef.current = textOffset
 
       let currentIdx = 0
       const chapters = el.querySelectorAll('[data-chapter]')
@@ -258,7 +296,7 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
         if (rect.top <= viewTop) currentIdx = Number((ch as HTMLElement).dataset.chapter) || 0
         else break
       }
-      onProgress?.(currentIdx, epubContent.spine.length, pct)
+      onProgress?.(currentIdx, epubContent.spine.length, pct, textOffset)
     }
 
     const onScroll = () => {
@@ -268,7 +306,7 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
     return () => el.removeEventListener('scroll', onScroll)
   }, [epubContent, onProgress])
 
-  // Bookmark navigation
+  // Bookmark navigation (legacy percent — prefer textOffset via useAnchorLayoutPin)
   const navigateToPercent = useAppStore((s) => s.navigateToPercent)
   const setNavigateToPercent = useAppStore((s) => s.setNavigateToPercent)
   useEffect(() => {

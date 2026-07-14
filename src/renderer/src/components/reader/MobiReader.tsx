@@ -10,6 +10,8 @@ import { useAnnotationStore } from '../../stores/annotationStore'
 import { annotationFormatForBook } from '../../lib/annotationTypes'
 import { shouldIgnoreReaderShortcut } from '../../lib/readerShortcuts'
 import { readScrollPercent, restoreScrollPercent } from '../../lib/scrollProgress'
+import { readTextOffsetAtView, restoreScrollByTextOffset } from '../../lib/readingAnchor'
+import { useAnchorLayoutPin } from '../../lib/useAnchorLayoutPin'
 import { stripHtmlToPlain, buildTitleAnchors } from '../../lib/bookSearch'
 import { useSearchHitNavigation } from '../../lib/useSearchHitNavigation'
 import AnnotationToolbar from './annotation/AnnotationToolbar'
@@ -20,12 +22,25 @@ import MarkSelectionHandler from './annotation/MarkSelectionHandler'
 interface Props {
   filePath: string
   onClose: () => void
-  onProgress?: (chapterIndex: number, chapterCount: number, percent: number) => void
+  onProgress?: (
+    chapterIndex: number,
+    chapterCount: number,
+    percent: number,
+    textOffset?: number
+  ) => void
   onTocReady?: (toc: { label: string; href: string; spineIndex: number }[]) => void
   initialProgress?: number
+  initialTextOffset?: number
 }
 
-export default function MobiReader({ filePath, onClose, onProgress, onTocReady, initialProgress }: Props) {
+export default function MobiReader({
+  filePath,
+  onClose,
+  onProgress,
+  onTocReady,
+  initialProgress,
+  initialTextOffset
+}: Props) {
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
   const [loading, setLoading] = useState(true)
@@ -35,6 +50,9 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
   const contentRef = useRef<HTMLDivElement | null>(null)
   const hasRestoredRef = useRef(false)
   const restoringRef = useRef(false)
+  const lastTextOffsetRef = useRef<number | null>(
+    initialTextOffset != null && initialTextOffset >= 0 ? initialTextOffset : null
+  )
   const currentBook = useAppStore((s) => s.currentBook)
 
   // Callback ref: stores DOM el in Zustand for TocPanel
@@ -65,6 +83,8 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
     const el = contentRef.current
     if (!el || chapters.length === 0) return
     const pct = readScrollPercent(el)
+    const textOffset = readTextOffsetAtView(el)
+    lastTextOffsetRef.current = textOffset
     let currentIdx = 0
     const sections = el.querySelectorAll('[data-chapter]')
     const containerRect = el.getBoundingClientRect()
@@ -74,7 +94,7 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
       if (rect.top <= viewTop) currentIdx = Number((sec as HTMLElement).dataset.chapter) || 0
       else break
     }
-    onProgress?.(currentIdx, chapters.length, pct)
+    onProgress?.(currentIdx, chapters.length, pct, textOffset)
   }, [chapters, onProgress])
 
   const flushProgressRef = useRef(flushProgress)
@@ -197,15 +217,30 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
   useEffect(() => {
     if (chapters.length === 0 || hasRestoredRef.current) return
 
+    const hasOffset = initialTextOffset != null && initialTextOffset >= 0
     const pct = initialProgress && initialProgress > 0 && initialProgress < 100 ? initialProgress : null
-    if (!pct) { hasRestoredRef.current = true; return }
+    if (!hasOffset && !pct) { hasRestoredRef.current = true; return }
 
     hasRestoredRef.current = true
     restoringRef.current = true
-    const stop = restoreScrollPercent(() => contentRef.current, pct)
+    if (hasOffset) {
+      lastTextOffsetRef.current = initialTextOffset!
+      const stop = restoreScrollByTextOffset(() => contentRef.current, initialTextOffset!)
+      const doneTimer = setTimeout(() => { restoringRef.current = false }, 4200)
+      return () => { stop(); clearTimeout(doneTimer); restoringRef.current = false }
+    }
+
+    const stop = restoreScrollPercent(() => contentRef.current, pct!)
     const doneTimer = setTimeout(() => { restoringRef.current = false }, 4200)
     return () => { stop(); clearTimeout(doneTimer); restoringRef.current = false }
-  }, [chapters, initialProgress])
+  }, [chapters, initialProgress, initialTextOffset])
+
+  useAnchorLayoutPin(contentRef, {
+    ready: chapters.length > 0,
+    fontSize,
+    lastTextOffsetRef,
+    restoringRef
+  })
 
   useEffect(() => {
     return () => { flushProgressRef.current() }
@@ -220,6 +255,8 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
     const update = () => {
       if (restoringRef.current) return
       const pct = readScrollPercent(el)
+      const textOffset = readTextOffsetAtView(el)
+      lastTextOffsetRef.current = textOffset
 
       let currentIdx = 0
       const sections = el.querySelectorAll('[data-chapter]')
@@ -230,7 +267,7 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
         if (rect.top <= viewTop) currentIdx = Number((sec as HTMLElement).dataset.chapter) || 0
         else break
       }
-      onProgress?.(currentIdx, chapters.length, pct)
+      onProgress?.(currentIdx, chapters.length, pct, textOffset)
     }
 
     const onScroll = () => {
@@ -240,7 +277,7 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
     return () => el.removeEventListener('scroll', onScroll)
   }, [loading, chapters, onProgress])
 
-  // Bookmark navigation
+  // Bookmark navigation (legacy percent)
   const navigateToPercent = useAppStore((s) => s.navigateToPercent)
   const setNavigateToPercent = useAppStore((s) => s.setNavigateToPercent)
   useEffect(() => {

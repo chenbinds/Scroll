@@ -41,6 +41,8 @@ export default function BookmarkPanel() {
   const highlights = useAnnotationStore((s) => s.highlights)
   const loaded = useAnnotationStore((s) => s.loaded)
 
+  const setNavigateToTextOffset = useAppStore((s) => s.setNavigateToTextOffset)
+
   const handleAdd = () => {
     const now = new Date()
     const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
@@ -49,13 +51,21 @@ export default function BookmarkPanel() {
       label,
       percent: readingPosition.percent,
       page: readingPosition.page,
+      textOffset: readingPosition.textOffset,
       time: Date.now()
     })
   }
 
-  const handleNavigateBookmark = (percent?: number, page?: number) => {
-    if (page != null) setNavigateToPage(page)
-    else if (percent !== undefined) setNavigateToPercent(percent)
+  const handleNavigateBookmark = (percent?: number, page?: number, textOffset?: number) => {
+    if (page != null && currentBook && /^(PDF|CBZ|CBR)$/i.test(currentBook.format)) {
+      setNavigateToPage(page)
+      return
+    }
+    if (textOffset != null && textOffset >= 0) {
+      setNavigateToTextOffset(textOffset)
+      return
+    }
+    if (percent !== undefined) setNavigateToPercent(percent)
   }
 
   const formatTime = (ts: number) => {
@@ -112,7 +122,7 @@ export default function BookmarkPanel() {
         )}
         {bookmarks.map((bm, i) => (
           <div key={`bm-${i}`}
-            onClick={() => handleNavigateBookmark(bm.percent, bm.page)}
+            onClick={() => handleNavigateBookmark(bm.percent, bm.page, bm.textOffset)}
             className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800/50
                        hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors group cursor-pointer">
             <BookmarkPlus size={14} className="text-scroll-500 shrink-0" />

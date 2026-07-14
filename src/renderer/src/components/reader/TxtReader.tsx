@@ -7,6 +7,8 @@ import { useAnnotationStore } from '../../stores/annotationStore'
 import { annotationFormatForBook } from '../../lib/annotationTypes'
 import { shouldIgnoreReaderShortcut } from '../../lib/readerShortcuts'
 import { readScrollPercent, restoreScrollPercent } from '../../lib/scrollProgress'
+import { readTextOffsetAtView, restoreScrollByTextOffset } from '../../lib/readingAnchor'
+import { useAnchorLayoutPin } from '../../lib/useAnchorLayoutPin'
 import { useSearchHitNavigation } from '../../lib/useSearchHitNavigation'
 import ReaderThemeBar from './ReaderThemeBar'
 import BackToLibraryButton from './BackToLibraryButton'
@@ -18,11 +20,18 @@ import MarkSelectionHandler from './annotation/MarkSelectionHandler'
 interface Props {
   filePath: string
   onClose: () => void
-  onProgress?: (pct: number) => void
+  onProgress?: (pct: number, textOffset?: number) => void
   initialProgress?: number
+  initialTextOffset?: number
 }
 
-export default function TxtReader({ filePath, onClose, onProgress, initialProgress }: Props) {
+export default function TxtReader({
+  filePath,
+  onClose,
+  onProgress,
+  initialProgress,
+  initialTextOffset
+}: Props) {
   const [chapters, setChapters] = useState<TxtChapter[]>([])
   const [title, setTitle] = useState('')
   const [loading, setLoading] = useState(true)
@@ -31,6 +40,9 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
   const contentRef = useRef<HTMLDivElement | null>(null)
   const hasRestoredRef = useRef(false)
   const restoringRef = useRef(false)
+  const lastTextOffsetRef = useRef<number | null>(
+    initialTextOffset != null && initialTextOffset >= 0 ? initialTextOffset : null
+  )
   const currentBook = useAppStore((s) => s.currentBook)
 
   const setContentRef = useCallback((el: HTMLDivElement | null) => {
@@ -59,7 +71,9 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
   const flushProgress = useCallback(() => {
     const el = contentRef.current
     if (!el) return
-    onProgress?.(readScrollPercent(el))
+    const textOffset = readTextOffsetAtView(el)
+    lastTextOffsetRef.current = textOffset
+    onProgress?.(readScrollPercent(el), textOffset)
   }, [onProgress])
 
   const flushProgressRef = useRef(flushProgress)
@@ -128,14 +142,31 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
 
   useEffect(() => {
     if (chapters.length === 0 || hasRestoredRef.current) return
-    if (!initialProgress || initialProgress <= 0 || initialProgress >= 100) return
+
+    const hasOffset = initialTextOffset != null && initialTextOffset >= 0
+    const pct = initialProgress && initialProgress > 0 && initialProgress < 100 ? initialProgress : null
+    if (!hasOffset && !pct) return
 
     hasRestoredRef.current = true
     restoringRef.current = true
-    const stop = restoreScrollPercent(() => contentRef.current, initialProgress)
+    if (hasOffset) {
+      lastTextOffsetRef.current = initialTextOffset!
+      const stop = restoreScrollByTextOffset(() => contentRef.current, initialTextOffset!)
+      const doneTimer = setTimeout(() => { restoringRef.current = false }, 4200)
+      return () => { stop(); clearTimeout(doneTimer); restoringRef.current = false }
+    }
+
+    const stop = restoreScrollPercent(() => contentRef.current, pct!)
     const doneTimer = setTimeout(() => { restoringRef.current = false }, 4200)
     return () => { stop(); clearTimeout(doneTimer); restoringRef.current = false }
-  }, [chapters, initialProgress])
+  }, [chapters, initialProgress, initialTextOffset])
+
+  useAnchorLayoutPin(contentRef, {
+    ready: chapters.length > 0,
+    fontSize,
+    lastTextOffsetRef,
+    restoringRef
+  })
 
   useEffect(() => {
     return () => { flushProgressRef.current() }
@@ -149,7 +180,9 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
     const update = () => {
       if (restoringRef.current) return
       const pct = readScrollPercent(el)
-      onProgress?.(pct)
+      const textOffset = readTextOffsetAtView(el)
+      lastTextOffsetRef.current = textOffset
+      onProgress?.(pct, textOffset)
 
       let chapterIdx = 0
       const sections = el.querySelectorAll('[data-chapter]')

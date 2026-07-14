@@ -17,6 +17,8 @@ export interface Book {
   addedAt: number
   lastReadAt: number
   progress: number // 0-100
+  /** Absolute text offset in continuous readers — layout-stable vs percent alone */
+  progressOffset?: number
   totalPages: number
   currentPage: number
 }
@@ -26,6 +28,8 @@ export interface Bookmark {
   href?: string
   page?: number
   percent?: number
+  /** Same layout-stable anchor as Book.progressOffset */
+  textOffset?: number
   time: number
 }
 
@@ -68,7 +72,12 @@ interface AppState {
   setBooks: (books: Book[]) => void
   addBook: (book: Book) => void
   removeBook: (id: string) => void
-  updateBookProgress: (id: string, progress: number, currentPage: number) => void
+  updateBookProgress: (
+    id: string,
+    progress: number,
+    currentPage: number,
+    progressOffset?: number
+  ) => void
 
   // AI config
   aiConfig: AiConfig
@@ -127,12 +136,20 @@ interface AppState {
   syncBookmarksForBook: (bookId: string) => void
 
   // Current reading position (for bookmark capture)
-  readingPosition: { chapter?: string; page?: number; percent: number }
-  setReadingPosition: (pos: { chapter?: string; page?: number; percent: number }) => void
+  readingPosition: { chapter?: string; page?: number; percent: number; textOffset?: number }
+  setReadingPosition: (pos: {
+    chapter?: string
+    page?: number
+    percent: number
+    textOffset?: number
+  }) => void
 
   // Navigate to a percentage position (for bookmark jump)
   navigateToPercent: number | null
   setNavigateToPercent: (pct: number | null) => void
+  /** Prefer over percent when jumping in continuous HTML readers */
+  navigateToTextOffset: number | null
+  setNavigateToTextOffset: (offset: number | null) => void
 
   // Navigate to page (PDF / Comic)
   navigateToPage: number | null
@@ -226,9 +243,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { books: sortBooksByRecent([book, ...s.books]) }
     }),
   removeBook: (id) => set((s) => ({ books: s.books.filter((b) => b.id !== id) })),
-  updateBookProgress: (id, progress, currentPage) =>
+  updateBookProgress: (id, progress, currentPage, progressOffset) =>
     set((s) => {
-      const patch = { progress, currentPage, lastReadAt: Date.now() }
+      const patch: Partial<Book> = { progress, currentPage, lastReadAt: Date.now() }
+      if (progressOffset != null && progressOffset >= 0) {
+        patch.progressOffset = progressOffset
+      }
       return {
         books: sortBooksByRecent(
           s.books.map((b) => (b.id === id ? { ...b, ...patch } : b))
@@ -349,6 +369,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   readingPosition: { percent: 0 },
   setReadingPosition: (pos) => set((s) => ({ readingPosition: { ...s.readingPosition, ...pos } })),
+
+  navigateToTextOffset: null,
+  setNavigateToTextOffset: (offset) => set({ navigateToTextOffset: offset }),
 
   navigateToPercent: null,
   setNavigateToPercent: (pct) => set({ navigateToPercent: pct }),
