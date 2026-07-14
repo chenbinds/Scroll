@@ -168,7 +168,22 @@ html.reader-immersive .reader-frame {
   background-color: var(--reader-bg);
 }
 
-.reader-content p { margin-bottom: var(--reader-paragraph-gap, 1.25rem); }
+.reader-content p {
+  text-indent: 2em;
+  margin-bottom: var(--reader-paragraph-gap, 1.25rem);
+}
+/* 居中/右对齐段落不缩进 */
+.reader-content p[style*="text-align:center"],
+.reader-content p[style*="text-align: center"],
+.reader-content p[style*="text-align:right"],
+.reader-content p[style*="text-align: right"] {
+  text-indent: 0;
+}
+/* 尊重 EPUB 内联显式设置的缩进 */
+.reader-content p[style*="text-indent:0"],
+.reader-content p[style*="text-indent: 0"] {
+  text-indent: 0;
+}
 .reader-content h1 { font-weight: 700; font-size: 1.5rem; margin: 2.5rem 0 1.25rem; }
 .reader-content h2 { font-weight: 700; font-size: 1.25rem; margin: 2rem 0 1rem; }
 .reader-content h3 { font-weight: 600; font-size: 1.125rem; margin: 1.5rem 0 0.75rem; }
