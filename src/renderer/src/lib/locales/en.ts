@@ -79,6 +79,11 @@ const en: Translations = {
   'reader.immersive': 'Immersive mode',
   'reader.exitImmersive': 'Exit immersive',
 
+  'lookup.action': 'Define',
+  'lookup.loading': 'Looking up…',
+  'lookup.failed': 'Lookup failed',
+  'lookup.notConfigured': 'Configure AI in Settings first',
+
   'annotation.mark': 'Mark',
   'annotation.brush': 'Brush',
   'annotation.eraser': 'Eraser',

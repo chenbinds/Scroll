@@ -82,6 +82,11 @@ const zh = {
   'reader.immersive': '沉浸阅读',
   'reader.exitImmersive': '退出沉浸',
 
+  'lookup.action': '查义',
+  'lookup.loading': '查询中…',
+  'lookup.failed': '查询失败',
+  'lookup.notConfigured': '请先在设置中配置 AI',
+
   // Annotation
   'annotation.mark': '标记',
   'annotation.brush': '画笔',
@@ -110,6 +115,7 @@ const zh = {
   'annotation.notePlaceholder': '输入笔记…',
   'annotation.noteSave': '保存笔记',
   'annotation.alreadyMarked': '该处已标记，不能重复标记',
+  'annotation.markPdfOnly': 'PDF / 漫画仅支持画笔与橡皮，不支持文字标记',
 
   // AI Panel
   'ai.notConfigured': 'AI 助手未配置',

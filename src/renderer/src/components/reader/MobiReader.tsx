@@ -18,6 +18,7 @@ import AnnotationToolbar from './annotation/AnnotationToolbar'
 import AnnotationOverlay from './annotation/AnnotationOverlay'
 import HighlightLayer from './annotation/HighlightLayer'
 import MarkSelectionHandler from './annotation/MarkSelectionHandler'
+import SelectionLookup from './SelectionLookup'
 
 interface Props {
   filePath: string
@@ -389,6 +390,7 @@ export default function MobiReader({
             <HighlightLayer scrollRef={contentRef} />
             <AnnotationOverlay scrollRef={contentRef} />
             <MarkSelectionHandler scrollRef={contentRef} />
+            <SelectionLookup scrollRef={contentRef} />
           </>
         )}
       </div>

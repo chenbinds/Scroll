@@ -13,7 +13,8 @@ function ToolButton({
   showChevron,
   onClick,
   onChevronClick,
-  disabled
+  disabled,
+  title
 }: {
   tool: AnnotationTool
   activeTool: AnnotationTool
@@ -23,14 +24,16 @@ function ToolButton({
   onClick: () => void
   onChevronClick?: () => void
   disabled?: boolean
+  title?: string
 }) {
   const active = activeTool === tool
   return (
-    <div className={`flex items-center ${disabled ? 'opacity-40 pointer-events-none' : ''}`}>
+    <div className={`flex items-center ${disabled ? 'opacity-40' : ''}`} title={title}>
       <button
         type="button"
         onClick={onClick}
         disabled={disabled}
+        title={title}
         className={`flex items-center gap-1 px-2 py-1 text-xs transition-colors
           ${active ? 'text-scroll-600 border-b-2 border-scroll-500' : 'chrome-muted hover:opacity-80'}
         `}

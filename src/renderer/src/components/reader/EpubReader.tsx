@@ -10,6 +10,7 @@ import AnnotationToolbar from './annotation/AnnotationToolbar'
 import AnnotationOverlay from './annotation/AnnotationOverlay'
 import HighlightLayer from './annotation/HighlightLayer'
 import MarkSelectionHandler from './annotation/MarkSelectionHandler'
+import SelectionLookup from './SelectionLookup'
 import { useAnnotationStore } from '../../stores/annotationStore'
 import { annotationFormatForBook } from '../../lib/annotationTypes'
 import { shouldIgnoreReaderShortcut } from '../../lib/readerShortcuts'
@@ -427,6 +428,7 @@ export default function EpubReader({
             <HighlightLayer scrollRef={contentRef} />
             <AnnotationOverlay scrollRef={contentRef} />
             <MarkSelectionHandler scrollRef={contentRef} />
+            <SelectionLookup scrollRef={contentRef} />
           </>
         )}
       </div>
