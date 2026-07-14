@@ -1,9 +1,12 @@
 import { useAppStore } from '../../stores/appStore'
-import { FONTS, type FontKey } from '../../lib/readingTheme'
+import { useI18n } from '../../lib/i18n'
+import { FONTS, FONT_LABEL_KEY, type FontKey } from '../../lib/readingTheme'
+import type { Translations } from '../../lib/locales/zh'
 import ThemeSelect from './ThemeSelect'
 import TypographyPanel from './TypographyPanel'
 
 export default function ReaderThemeBar() {
+  const { t } = useI18n()
   const { readingFont, setReadingFont } = useAppStore()
   const fontKeys = Object.keys(FONTS) as FontKey[]
 
@@ -18,7 +21,9 @@ export default function ReaderThemeBar() {
                    chrome-muted cursor-pointer"
       >
         {fontKeys.map((key) => (
-          <option key={key} value={key}>{FONTS[key].name}</option>
+          <option key={key} value={key}>
+            {t(FONT_LABEL_KEY[key] as keyof Translations)}
+          </option>
         ))}
       </select>
       <span className="chrome-divider" />

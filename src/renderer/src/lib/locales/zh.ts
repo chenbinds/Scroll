@@ -82,6 +82,16 @@ const zh = {
   'reader.immersive': '沉浸阅读',
   'reader.exitImmersive': '退出沉浸',
 
+  'theme.title': '阅读主题',
+  'theme.light': '明亮',
+  'theme.paper': '纸张',
+  'theme.eyeCare': '护眼',
+  'theme.dark': '暗色',
+  'theme.nature': '自然',
+  'font.system': '系统默认',
+  'font.serif': '宋体/衬线',
+  'font.sans': '黑体/无衬线',
+
   'lookup.action': '查义',
   'lookup.loading': '查询中…',
   'lookup.failed': '查询失败',

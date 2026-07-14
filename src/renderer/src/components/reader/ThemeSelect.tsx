@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
-import { THEMES, type ThemeKey } from '../../lib/readingTheme'
+import { useI18n } from '../../lib/i18n'
+import { THEMES, THEME_LABEL_KEY, type ThemeKey } from '../../lib/readingTheme'
+import type { Translations } from '../../lib/locales/zh'
 
 interface Props {
   /** settings = wider panel style */
@@ -9,6 +11,7 @@ interface Props {
 }
 
 export default function ThemeSelect({ variant = 'toolbar' }: Props) {
+  const { t } = useI18n()
   const { readingTheme, setReadingTheme } = useAppStore()
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -32,12 +35,13 @@ export default function ThemeSelect({ variant = 'toolbar' }: Props) {
   }, [open])
 
   const isSettings = variant === 'settings'
+  const labelOf = (key: ThemeKey) => t(THEME_LABEL_KEY[key] as keyof Translations)
 
   return (
     <div ref={rootRef} className={`relative ${isSettings ? 'w-full' : ''}`}>
       <button
         type="button"
-        title="阅读主题"
+        title={t('theme.title')}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -54,7 +58,7 @@ export default function ThemeSelect({ variant = 'toolbar' }: Props) {
           className="w-3.5 h-3.5 rounded-full border border-black/20 dark:border-white/25 flex-shrink-0"
           style={{ backgroundColor: current.bg }}
         />
-        <span className="flex-1 text-left">{current.name}</span>
+        <span className="flex-1 text-left">{labelOf(readingTheme)}</span>
         <ChevronDown size={12} className={`opacity-60 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
@@ -70,7 +74,7 @@ export default function ThemeSelect({ variant = 'toolbar' }: Props) {
           }
         >
           {themeKeys.map((key) => {
-            const t = THEMES[key]
+            const theme = THEMES[key]
             const active = readingTheme === key
             return (
               <button
@@ -95,9 +99,9 @@ export default function ThemeSelect({ variant = 'toolbar' }: Props) {
                 <span
                   className={`w-4 h-4 rounded-full flex-shrink-0 border
                     ${active ? 'border-scroll-500 ring-1 ring-scroll-400' : 'border-black/20 dark:border-white/25'}`}
-                  style={{ backgroundColor: t.bg }}
+                  style={{ backgroundColor: theme.bg }}
                 />
-                <span>{t.name}</span>
+                <span>{labelOf(key)}</span>
               </button>
             )
           })}

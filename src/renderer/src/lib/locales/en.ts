@@ -79,6 +79,16 @@ const en: Translations = {
   'reader.immersive': 'Immersive mode',
   'reader.exitImmersive': 'Exit immersive',
 
+  'theme.title': 'Reading theme',
+  'theme.light': 'Light',
+  'theme.paper': 'Paper',
+  'theme.eyeCare': 'Eye care',
+  'theme.dark': 'Dark',
+  'theme.nature': 'Nature',
+  'font.system': 'System',
+  'font.serif': 'Serif',
+  'font.sans': 'Sans',
+
   'lookup.action': 'Define',
   'lookup.loading': 'Looking up…',
   'lookup.failed': 'Lookup failed',

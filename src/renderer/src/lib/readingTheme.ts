@@ -10,10 +10,9 @@ interface ThemeDef {
   surfaceRaised: string
   border: string
   muted: string
-  name: string
 }
 
-interface FontDef { css: string; name: string }
+interface FontDef { css: string }
 
 export const THEMES: Record<ThemeKey, ThemeDef> = {
   light: {
@@ -22,8 +21,7 @@ export const THEMES: Record<ThemeKey, ThemeDef> = {
     surface: '#F3F4F6',
     surfaceRaised: '#E8EAED',
     border: '#B8BFC9',
-    muted: '#6B7280',
-    name: '明亮'
+    muted: '#6B7280'
   },
   paper: {
     bg: '#F5F0E8',
@@ -31,8 +29,7 @@ export const THEMES: Record<ThemeKey, ThemeDef> = {
     surface: '#E8E0D4',
     surfaceRaised: '#DDD4C6',
     border: '#B8AA96',
-    muted: '#7A6B5C',
-    name: '纸张'
+    muted: '#7A6B5C'
   },
   eyeCare: {
     bg: '#C7EDCC',
@@ -40,8 +37,7 @@ export const THEMES: Record<ThemeKey, ThemeDef> = {
     surface: '#B5E0BB',
     surfaceRaised: '#A3D4AA',
     border: '#7FB889',
-    muted: '#4A7352',
-    name: '护眼'
+    muted: '#4A7352'
   },
   dark: {
     bg: '#1A1A2E',
@@ -49,8 +45,7 @@ export const THEMES: Record<ThemeKey, ThemeDef> = {
     surface: '#24243A',
     surfaceRaised: '#2E2E48',
     border: '#454560',
-    muted: '#9494A8',
-    name: '暗色'
+    muted: '#9494A8'
   },
   nature: {
     bg: '#F4ECD8',
@@ -58,18 +53,30 @@ export const THEMES: Record<ThemeKey, ThemeDef> = {
     surface: '#E8DFC8',
     surfaceRaised: '#DDD2B8',
     border: '#B9A888',
-    muted: '#8A7960',
-    name: '自然'
+    muted: '#8A7960'
   }
 }
 
 export const FONTS: Record<FontKey, FontDef> = {
-  system: { css: '', name: '系统默认' },
-  serif: { css: 'Georgia, "Noto Serif SC", "Source Han Serif SC", "STSong", serif', name: '宋体/衬线' },
+  system: { css: '' },
+  serif: { css: 'Georgia, "Noto Serif SC", "Source Han Serif SC", "STSong", serif' },
   sans: {
-    css: '"Inter", "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif',
-    name: '黑体/无衬线'
+    css: '"Inter", "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif'
   }
+}
+
+export const THEME_LABEL_KEY: Record<ThemeKey, string> = {
+  light: 'theme.light',
+  paper: 'theme.paper',
+  eyeCare: 'theme.eyeCare',
+  dark: 'theme.dark',
+  nature: 'theme.nature'
+}
+
+export const FONT_LABEL_KEY: Record<FontKey, string> = {
+  system: 'font.system',
+  serif: 'font.serif',
+  sans: 'font.sans'
 }
 
 export function getThemeStyle(theme: ThemeKey, font: FontKey): React.CSSProperties {
