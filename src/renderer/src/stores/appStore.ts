@@ -1,4 +1,10 @@
 import { create } from 'zustand'
+import {
+  searchChapters as runChapterSearch,
+  clearSearchHighlight,
+  type SearchChapter,
+  type SearchHit
+} from '../lib/bookSearch'
 
 export interface Book {
   id: string
@@ -68,11 +74,11 @@ interface AppState {
   aiConfig: AiConfig
   setAiConfig: (config: Partial<AiConfig>) => void
 
-  // Left sidebar (TOC + Bookmarks)
+  // Left sidebar (TOC + Bookmarks + Search)
   leftSidebarOpen: boolean
-  leftSidebarTab: 'toc' | 'bookmarks'
-  toggleLeftSidebar: (tab: 'toc' | 'bookmarks') => void
-  setLeftSidebarTab: (tab: 'toc' | 'bookmarks') => void
+  leftSidebarTab: 'toc' | 'bookmarks' | 'search'
+  toggleLeftSidebar: (tab: 'toc' | 'bookmarks' | 'search') => void
+  setLeftSidebarTab: (tab: 'toc' | 'bookmarks' | 'search') => void
   // Right sidebar (AI)
   rightSidebarOpen: boolean
   toggleRightSidebar: () => void
@@ -91,6 +97,24 @@ interface AppState {
   // TocPanel reads this to find and scroll to chapters
   _readerEl: HTMLElement | null
   _setReaderEl: (el: HTMLElement | null) => void
+
+  // In-book search (EPUB / TXT / MOBI)
+  searchChapters: SearchChapter[]
+  setSearchChapters: (chapters: SearchChapter[]) => void
+  searchQuery: string
+  searchHits: SearchHit[]
+  activeHitIndex: number
+  /** Bumped to request SearchPanel input focus */
+  searchFocusNonce: number
+  setSearchQuery: (query: string) => void
+  runSearch: (query?: string) => void
+  setActiveHitIndex: (index: number) => void
+  goToSearchHit: (index: number) => void
+  clearSearch: () => void
+  openSearchPanel: () => void
+  /** Set when jumping to a hit — readers listen and clear */
+  pendingSearchHit: SearchHit | null
+  clearPendingSearchHit: () => void
 
   // Bookmarks (current book only; persisted in bookmarksByBook)
   bookmarks: Bookmark[]
@@ -185,7 +209,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       bookmarks: bookmarksByBook[book.id] ?? [],
       bookmarksByBook,
       aiContext: { bookTitle: opened.title },
-      aiDraft: null
+      aiDraft: null,
+      searchChapters: [],
+      searchQuery: '',
+      searchHits: [],
+      activeHitIndex: -1,
+      pendingSearchHit: null
     })
   },
 
@@ -237,6 +266,47 @@ export const useAppStore = create<AppState>((set, get) => ({
   _readerEl: null,
   _setReaderEl: (el) => set({ _readerEl: el }),
 
+  searchChapters: [],
+  setSearchChapters: (chapters) => set({ searchChapters: chapters }),
+  searchQuery: '',
+  searchHits: [],
+  activeHitIndex: -1,
+  searchFocusNonce: 0,
+  setSearchQuery: (query) => set({ searchQuery: query }),
+  runSearch: (query) => {
+    const q = (query ?? get().searchQuery).trim()
+    const hits = runChapterSearch(get().searchChapters, q)
+    set({
+      searchQuery: query !== undefined ? query : get().searchQuery,
+      searchHits: hits,
+      activeHitIndex: hits.length > 0 ? 0 : -1,
+      pendingSearchHit: hits.length > 0 ? { ...hits[0] } : null
+    })
+    if (hits.length === 0) clearSearchHighlight()
+  },
+  setActiveHitIndex: (index) => set({ activeHitIndex: index }),
+  goToSearchHit: (index) => {
+    const hits = get().searchHits
+    if (index < 0 || index >= hits.length) return
+    set({ activeHitIndex: index, pendingSearchHit: { ...hits[index] } })
+  },
+  clearSearch: () => {
+    clearSearchHighlight()
+    set({
+      searchQuery: '',
+      searchHits: [],
+      activeHitIndex: -1,
+      pendingSearchHit: null
+    })
+  },
+  openSearchPanel: () =>
+    set((s) => ({
+      leftSidebarOpen: true,
+      leftSidebarTab: 'search',
+      searchFocusNonce: s.searchFocusNonce + 1
+    })),
+  pendingSearchHit: null,
+  clearPendingSearchHit: () => set({ pendingSearchHit: null }),
 
   bookmarks: [],
   bookmarksByBook: {},

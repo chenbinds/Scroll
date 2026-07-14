@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { FileText, Bookmark } from 'lucide-react'
+import { FileText, Bookmark, Search } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useI18n } from '../../lib/i18n'
 import TocPanel from './TocPanel'
 import BookmarkPanel from './BookmarkPanel'
+import SearchPanel from './SearchPanel'
 
 const WIDTH_KEY = 'scroll-left-sidebar-width'
 const DEFAULT_WIDTH = 288 // w-72
@@ -59,44 +60,53 @@ export default function LeftSidebar() {
     window.addEventListener('mouseup', onUp)
   }, [width])
 
+  const tabClass = (tab: typeof leftSidebarTab) =>
+    `flex-1 flex items-center justify-center gap-1 py-2.5 text-xs font-medium transition-colors ${
+      leftSidebarTab === tab
+        ? 'text-scroll-600 dark:text-scroll-400 border-b-2 border-scroll-500 chrome-surface-raised'
+        : 'chrome-muted hover:opacity-80'
+    }`
+
   return (
     <aside
       style={{ width }}
       className="relative chrome-border-r flex flex-col chrome-surface overflow-hidden flex-shrink-0"
     >
-      {/* Tab bar */}
       <div className="flex chrome-border-b">
-        <button
-          onClick={() => setLeftSidebarTab('toc')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors ${
-            leftSidebarTab === 'toc'
-              ? 'text-scroll-600 dark:text-scroll-400 border-b-2 border-scroll-500 chrome-surface-raised'
-              : 'chrome-muted hover:opacity-80'
-          }`}
-        >
+        <button type="button" onClick={() => setLeftSidebarTab('toc')} className={tabClass('toc')} title={t('app.toc')}>
           <FileText size={14} />
-          {t('app.toc')}
+          <span className="truncate">{t('app.toc')}</span>
         </button>
         <button
+          type="button"
           onClick={() => setLeftSidebarTab('bookmarks')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors ${
-            leftSidebarTab === 'bookmarks'
-              ? 'text-scroll-600 dark:text-scroll-400 border-b-2 border-scroll-500 chrome-surface-raised'
-              : 'chrome-muted hover:opacity-80'
-          }`}
+          className={tabClass('bookmarks')}
+          title={t('app.bookmarks')}
         >
           <Bookmark size={14} />
-          {t('app.bookmarks')}
+          <span className="truncate max-w-[4.5rem]">{t('app.bookmarksShort')}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setLeftSidebarTab('search')}
+          className={tabClass('search')}
+          title={t('app.search')}
+        >
+          <Search size={14} />
+          <span className="truncate">{t('app.search')}</span>
         </button>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div
+        className={`flex-1 min-h-0 ${
+          leftSidebarTab === 'search' ? 'overflow-hidden' : 'overflow-y-auto'
+        }`}
+      >
         {leftSidebarTab === 'toc' && <TocPanel />}
         {leftSidebarTab === 'bookmarks' && <BookmarkPanel />}
+        {leftSidebarTab === 'search' && <SearchPanel />}
       </div>
 
-      {/* Drag handle — right edge */}
       <div
         role="separator"
         aria-orientation="vertical"

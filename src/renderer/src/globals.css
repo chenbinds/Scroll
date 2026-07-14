@@ -177,3 +177,9 @@ body {
 
 ::selection { background: #bac8ff; color: #111827; }
 .dark ::selection { background: #364fc7; color: #f3f4f6; }
+
+/* CSS Highlight API — in-book search current hit */
+::highlight(scroll-search) {
+  background-color: rgba(250, 204, 21, 0.45);
+  color: inherit;
+}

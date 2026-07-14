@@ -14,6 +14,8 @@ import { useAnnotationStore } from '../../stores/annotationStore'
 import { annotationFormatForBook } from '../../lib/annotationTypes'
 import { shouldIgnoreReaderShortcut } from '../../lib/readerShortcuts'
 import { readScrollPercent, restoreScrollPercent } from '../../lib/scrollProgress'
+import { stripHtmlToPlain } from '../../lib/bookSearch'
+import { useSearchHitNavigation } from '../../lib/useSearchHitNavigation'
 
 interface Props {
   filePath: string
@@ -45,9 +47,14 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
     useAppStore.getState()._setReaderEl(el)
   }, [])
 
-  // Cleanup TOC on unmount
+  useSearchHitNavigation(contentRef)
+
+  // Cleanup TOC + search on unmount
   useEffect(() => {
-    return () => { useAppStore.getState().setToc([]) }
+    return () => {
+      useAppStore.getState().setToc([])
+      useAppStore.getState().setSearchChapters([])
+    }
   }, [])
 
   // Load annotations for current book
@@ -147,6 +154,23 @@ export default function EpubReader({ filePath, onClose, onProgress, onTocReady, 
     load()
     return () => { cancelled = true }
   }, [filePath])
+
+  // Build in-book search index from spine HTML (same body text as renderer)
+  useEffect(() => {
+    if (!epubContent) return
+    const chapters = epubContent.spine.map((item, i) => {
+      const html = epubContent.files.get(item.href) || ''
+      const label =
+        epubContent.toc.find((t) => t.spineIndex === i)?.label ||
+        item.href
+      return {
+        chapterIndex: i,
+        title: label,
+        plainText: stripHtmlToPlain(extractBody(html))
+      }
+    })
+    useAppStore.getState().setSearchChapters(chapters)
+  }, [epubContent])
 
   // Restore reading position (high precision + re-apply while layout settles)
   useEffect(() => {

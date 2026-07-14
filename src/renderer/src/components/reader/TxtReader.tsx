@@ -7,6 +7,7 @@ import { useAnnotationStore } from '../../stores/annotationStore'
 import { annotationFormatForBook } from '../../lib/annotationTypes'
 import { shouldIgnoreReaderShortcut } from '../../lib/readerShortcuts'
 import { readScrollPercent, restoreScrollPercent } from '../../lib/scrollProgress'
+import { useSearchHitNavigation } from '../../lib/useSearchHitNavigation'
 import ReaderThemeBar from './ReaderThemeBar'
 import BackToLibraryButton from './BackToLibraryButton'
 import AnnotationToolbar from './annotation/AnnotationToolbar'
@@ -37,8 +38,13 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
     useAppStore.getState()._setReaderEl(el)
   }, [])
 
+  useSearchHitNavigation(contentRef)
+
   useEffect(() => {
-    return () => { useAppStore.getState().setToc([]) }
+    return () => {
+      useAppStore.getState().setToc([])
+      useAppStore.getState().setSearchChapters([])
+    }
   }, [])
 
   useEffect(() => {
@@ -108,6 +114,17 @@ export default function TxtReader({ filePath, onClose, onProgress, initialProgre
     load()
     return () => { cancelled = true }
   }, [filePath])
+
+  useEffect(() => {
+    if (chapters.length === 0) return
+    useAppStore.getState().setSearchChapters(
+      chapters.map((ch, i) => ({
+        chapterIndex: i,
+        title: ch.title,
+        plainText: ch.content
+      }))
+    )
+  }, [chapters])
 
   useEffect(() => {
     if (chapters.length === 0 || hasRestoredRef.current) return

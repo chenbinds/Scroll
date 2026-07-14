@@ -4,6 +4,8 @@ const zh = {
   'app.backToLibrary': '书架',
   'app.toc': '目录',
   'app.bookmarks': '书签 & 标注',
+  'app.bookmarksShort': '书签',
+  'app.search': '搜索',
   'app.ai': 'AI 助手',
   'app.music': '音乐',
   'app.settings': '设置',
@@ -43,6 +45,17 @@ const zh = {
   'bookmarks.chapter': '章',
   'bookmarks.brushStroke': '画笔标注',
   'bookmarks.highlight': '高亮标记',
+
+  // Search
+  'search.placeholder': '在本书中搜索…',
+  'search.submit': '搜索',
+  'search.clear': '清除',
+  'search.prev': '上一条',
+  'search.next': '下一条',
+  'search.hint': '输入关键词后回车或点搜索',
+  'search.empty': '未找到匹配内容',
+  'search.unavailable': '当前格式暂不支持搜索（支持 EPUB / TXT / MOBI）',
+  'search.capped': '结果已截断（最多 200 条）',
 
   // Reader
   'reader.placeholder.title': '阅读器引擎开发中',

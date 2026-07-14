@@ -10,6 +10,8 @@ import { useAnnotationStore } from '../../stores/annotationStore'
 import { annotationFormatForBook } from '../../lib/annotationTypes'
 import { shouldIgnoreReaderShortcut } from '../../lib/readerShortcuts'
 import { readScrollPercent, restoreScrollPercent } from '../../lib/scrollProgress'
+import { stripHtmlToPlain } from '../../lib/bookSearch'
+import { useSearchHitNavigation } from '../../lib/useSearchHitNavigation'
 import AnnotationToolbar from './annotation/AnnotationToolbar'
 import AnnotationOverlay from './annotation/AnnotationOverlay'
 import HighlightLayer from './annotation/HighlightLayer'
@@ -41,9 +43,14 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
     useAppStore.getState()._setReaderEl(el)
   }, [])
 
-  // Cleanup TOC on unmount
+  useSearchHitNavigation(contentRef)
+
+  // Cleanup TOC + search on unmount
   useEffect(() => {
-    return () => { useAppStore.getState().setToc([]) }
+    return () => {
+      useAppStore.getState().setToc([])
+      useAppStore.getState().setSearchChapters([])
+    }
   }, [])
 
   // Load annotations (MOBI / AZW / AZW3 share format "mobi")
@@ -161,6 +168,17 @@ export default function MobiReader({ filePath, onClose, onProgress, onTocReady, 
       destroyBook?.()
     }
   }, [filePath])
+
+  useEffect(() => {
+    if (chapters.length === 0) return
+    useAppStore.getState().setSearchChapters(
+      chapters.map((ch, i) => ({
+        chapterIndex: i,
+        title: ch.title,
+        plainText: stripHtmlToPlain(ch.html)
+      }))
+    )
+  }, [chapters])
 
   // Restore reading position
   useEffect(() => {

@@ -201,6 +201,11 @@ export default function App() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key === 'S') { e.preventDefault(); setShowSettings(true) }
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === 'f' || e.key === 'F') && currentView === 'reader') {
+        e.preventDefault()
+        useAppStore.getState().openSearchPanel()
+        return
+      }
       if (e.key === 'Escape' && currentView === 'reader') {
         e.preventDefault()
         const store = useAnnotationStore.getState()

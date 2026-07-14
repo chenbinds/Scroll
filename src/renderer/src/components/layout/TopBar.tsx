@@ -1,4 +1,4 @@
-import { Book, Settings, Bookmark, MessageCircle, FileText, Music } from 'lucide-react'
+import { Book, Settings, Bookmark, MessageCircle, FileText, Music, Search } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useMusicStore } from '../../stores/musicStore'
 import { useI18n } from '../../lib/i18n'
@@ -34,7 +34,6 @@ export default function TopBar({ onOpenSettings }: Props) {
       <div className="flex items-center gap-1">
         {currentView === 'reader' && (
           <>
-            {/* Left sidebar toggles: TOC + Bookmarks */}
             <button
               onClick={() => toggleLeftSidebar('toc')}
               className={`p-2 rounded-md transition-colors ${
@@ -57,10 +56,20 @@ export default function TopBar({ onOpenSettings }: Props) {
             >
               <Bookmark size={18} />
             </button>
+            <button
+              onClick={() => toggleLeftSidebar('search')}
+              className={`p-2 rounded-md transition-colors ${
+                leftSidebarOpen && leftSidebarTab === 'search'
+                  ? 'bg-scroll-100 dark:bg-scroll-900 text-scroll-600'
+                  : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+              title={`${t('app.search')} (Ctrl+F)`}
+            >
+              <Search size={18} />
+            </button>
 
             <div className="chrome-divider" />
 
-            {/* Right sidebar toggle: AI */}
             <button
               onClick={toggleRightSidebar}
               className={`p-2 rounded-md transition-colors ${
