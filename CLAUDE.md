@@ -125,7 +125,7 @@ MOBI/AZW3 → foliate-js (mobi.js) → MobiReader 全量渲染
 
 ## 待实现
 
-见根目录 **`TODO.md`**（**P0 抽验、P2 格式补齐、P6 杀软** 等）。
+见根目录 **`TODO.md`**（**P0 验收 → P7 搜索/锚点/导出**；P2 格式有样书再做；P6 杀软）。
 
 ## PowerShell
 

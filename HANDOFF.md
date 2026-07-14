@@ -7,7 +7,7 @@
 
 ## 当前状态 (2026-07-14)
 
-- **Git**：`master` 已与 `origin` 同步（`025d0f4`）
+- **Git**：本地 `master` 含 `2d49e99`（主题统一 / 进度 / 标注流畅）；是否已 push 以 `git status` 为准
 - **阅读**：EPUB / TXT / PDF / CBZ / MOBI(AZW3) 可用
 - **标注**：EPUB/MOBI/TXT 全套；PDF/CBZ 画笔；侧栏列表 + 书签按书
 - **AI**：SSE 流式、按书会话、选区/标注提问、设置页连通性测试
@@ -15,13 +15,13 @@
 - **书架**：按 `lastReadAt` 倒序；Z-Library 外链（`zlib.ch`）
 - **音乐**：P3 完成（持久化、添加曲目弹窗、阅读快捷键冲突）
 - **打包**：`pack.bat` → `dist/Scroll-{ver}-win-x64.zip`
-- **下一优先**：`TODO.md` **P0** 人工验收
+- **下一优先**：`TODO.md` —— **P0 验收** → **P7**（书内搜索 → 锚点进度 → 标注导出）
 
 ## 启动方式
 
 | 用途 | 方式 |
 |------|------|
-| 开发日常 | `Scroll.vbs`（优先 `release/Scroll.exe`） |
+| 开发日常 | `Scroll.vbs`（`out/` 新于 `release\Scroll.exe` 时用 `out/`） |
 | 仅构建 | `rebuild.bat` 或 `npx electron-vite build` |
 | **分发他人** | **`pack.bat`**（见 `docs/05-packaging.md`） |
 | 开发 | `start.bat` |
