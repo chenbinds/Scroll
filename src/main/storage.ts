@@ -3,7 +3,8 @@
  *
  * 替代 better-sqlite3，零编译依赖。
  * 数据存储在应用 userData 目录下的 JSON 文件中。
- * 打包版：userData 位于 exe 旁 UserData/（见 portableData.ts）
+ * 项目内运行：`<项目根>/UserData/`（开发 out/ 与 win-unpacked 共用）
+ * 真正便携包：exe 旁 `UserData/`（见 portableData.ts）
  * 适用于 MVP 阶段的数据持久化需求。
  */
 

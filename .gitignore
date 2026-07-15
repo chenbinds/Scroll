@@ -30,6 +30,9 @@ dist/
 build/
 release/
 
+# Local bookshelf / settings (unified portable UserData)
+UserData/
+
 # electron-builder 输出
 *.exe
 *.msi

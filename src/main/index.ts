@@ -65,6 +65,22 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
+  // Block in-page navigations that leave the SPA (e.g. EPUB <a href="ch1.xhtml"> → white screen)
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const current = mainWindow?.webContents.getURL() || ''
+    try {
+      const cur = new URL(current)
+      const next = new URL(url)
+      if (cur.origin === next.origin && cur.pathname === next.pathname) return
+    } catch {
+      /* fall through */
+    }
+    event.preventDefault()
+    if (/^https?:\/\//i.test(url)) {
+      void shell.openExternal(url)
+    }
+  })
+
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {

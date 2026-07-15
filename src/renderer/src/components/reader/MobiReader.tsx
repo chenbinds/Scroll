@@ -14,6 +14,7 @@ import { readTextOffsetAtView, restoreScrollByTextOffset } from '../../lib/readi
 import { useAnchorLayoutPin } from '../../lib/useAnchorLayoutPin'
 import { stripHtmlToPlain, buildTitleAnchors } from '../../lib/bookSearch'
 import { useSearchHitNavigation } from '../../lib/useSearchHitNavigation'
+import { attachReaderLinkInterceptor } from '../../lib/readerLinkNavigation'
 import AnnotationToolbar from './annotation/AnnotationToolbar'
 import AnnotationOverlay from './annotation/AnnotationOverlay'
 import HighlightLayer from './annotation/HighlightLayer'
@@ -63,6 +64,14 @@ export default function MobiReader({
   }, [])
 
   useSearchHitNavigation(contentRef)
+
+  // Intercept in-content <a href> so chapter links do not navigate the SPA blank
+  useEffect(() => {
+    if (loading || error || chapters.length === 0) return
+    const el = contentRef.current
+    if (!el) return
+    return attachReaderLinkInterceptor(el)
+  }, [loading, error, chapters])
 
   // Cleanup TOC + search on unmount
   useEffect(() => {

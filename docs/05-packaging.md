@@ -41,6 +41,8 @@ dist/
 
 **整夹复制即可运行**；若需带走数据，一并复制 `UserData/`。
 
+开发机上的 `Scroll.vbs` / `release/win-unpacked` 共用项目根目录 **`UserData/`**（不再写到 `%AppData%`），避免切换启动方式时书架「消失又出现」。`pack.bat` **不会**把开发机的 `UserData` 打进 zip。
+
 `release/`、`out/`、`dist/` 均在 `.gitignore` 中，**不提交 Git**。
 
 ## 配置要点

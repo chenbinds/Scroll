@@ -16,7 +16,7 @@
 
 | 用途 | 命令/文件 | 说明 |
 |------|-----------|------|
-| 开发日常 | `Scroll.vbs` | 优先 `release/win-unpacked/Scroll.exe`，否则 electron + `out/` |
+| 开发日常 | `Scroll.vbs` | 优先 `electron + out/`；数据在项目根 `UserData/` |
 | 仅构建 | `rebuild.bat` | 只构建到 `out/` |
 | **分发打包** | **`pack.bat`** | 便携 exe + `dist/*.zip`（见 `docs/05-packaging.md`） |
 | 兼容入口 | `build.bat` | 转发至 `pack.bat` |
@@ -89,7 +89,7 @@ MOBI/AZW3 → foliate-js (mobi.js) → MobiReader 全量渲染
 
 ### TOC 导航：callback ref + Zustand `_readerEl`
 
-### 封面：`UserData/covers/{id}.jpg`（打包版）或 `userData/covers/`（开发），JSON 只存 `scroll-cover://local/{id}`
+### 封面：项目根 `UserData/covers/{id}.jpg`（开发）或 exe 旁 `UserData/covers/`（真正便携包），JSON 只存 `scroll-cover://local/{id}`
 
 ### 豆瓣评分
 - 主进程 `douban.ts` 代理请求

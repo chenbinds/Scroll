@@ -60,7 +60,11 @@ Stop-ScrollApp
 $staging = Join-Path $env:TEMP ("scroll-pack-" + [guid]::NewGuid().ToString('n'))
 $stagingFolder = Join-Path $staging $distName
 New-Item -ItemType Directory -Force -Path $stagingFolder | Out-Null
-Copy-Item -Path (Join-Path $unpackedDir '*') -Destination $stagingFolder -Recurse -Force
+
+# Copy runtime files only — never ship developer UserData into the zip
+Get-ChildItem -Path $unpackedDir -Force | Where-Object { $_.Name -ne 'UserData' } | ForEach-Object {
+    Copy-Item -Path $_.FullName -Destination $stagingFolder -Recurse -Force
+}
 
 $templatePath = Join-Path $PSScriptRoot 'README.dist.txt'
 if (-not (Test-Path $templatePath)) {

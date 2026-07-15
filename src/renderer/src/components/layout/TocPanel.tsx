@@ -1,5 +1,6 @@
 import { useAppStore } from '../../stores/appStore'
 import { useI18n } from '../../lib/i18n'
+import { scrollReaderToHref } from '../../lib/readerLinkNavigation'
 
 // Recursive TOC item renderer
 function TocItemRow({ item, depth, onClick }: {
@@ -35,26 +36,13 @@ export default function TocPanel() {
     const readerEl = useAppStore.getState()._readerEl
     if (!readerEl) return
 
-    // Find the chapter section
+    // Prefer path/#fragment resolution (same as in-content links)
+    if (href && scrollReaderToHref(readerEl, href)) return
+
+    // Fallback: spine index only
     const chapter = readerEl.querySelector(`[data-chapter="${spineIndex}"]`)
       || readerEl.querySelector(`[data-id="chapter-${spineIndex}"]`)
-    if (!chapter) return
-
-    // Check for fragment anchor (e.g., href="text.xhtml#section1")
-    const fragment = href.includes('#') ? href.split('#')[1] : null
-    let target: HTMLElement | null = null
-    if (fragment) {
-      try {
-        target = chapter.querySelector(`#${CSS.escape(fragment)}`) as HTMLElement | null
-          || chapter.querySelector(`a[name="${CSS.escape(fragment)}"]`) as HTMLElement | null
-      } catch { /* invalid fragment */ }
-    }
-
-    if (target) {
-      // Fragment target: center it in viewport so surrounding context (headings) is visible
-      target.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    } else {
-      // No fragment: scroll to chapter start
+    if (chapter) {
       chapter.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }
