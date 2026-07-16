@@ -278,6 +278,85 @@ export function clearSearchHighlight(): void {
   }
 }
 
+/** Run work in idle slices so cold-start UI stays responsive. */
+export function runIdleSlices(
+  work: () => boolean,
+  options?: { sliceMs?: number; timeout?: number }
+): () => void {
+  const sliceMs = options?.sliceMs ?? 6
+  const timeout = options?.timeout ?? 200
+  let cancelled = false
+  let idleId = 0
+  let timerId = 0
+
+  const schedule = (cb: () => void) => {
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number
+      cancelIdleCallback?: (id: number) => void
+    }
+    if (w.requestIdleCallback) {
+      idleId = w.requestIdleCallback(() => { cb() }, { timeout })
+    } else {
+      timerId = window.setTimeout(cb, 16)
+    }
+  }
+
+  const tick = () => {
+    if (cancelled) return
+    const start = performance.now()
+    let more = true
+    while (more && performance.now() - start < sliceMs) {
+      more = work()
+    }
+    if (more && !cancelled) schedule(tick)
+  }
+
+  schedule(tick)
+
+  return () => {
+    cancelled = true
+    const w = window as Window & { cancelIdleCallback?: (id: number) => void }
+    if (idleId) w.cancelIdleCallback?.(idleId)
+    if (timerId) clearTimeout(timerId)
+  }
+}
+
+/**
+ * Build search chapters one-by-one on the idle queue.
+ * `buildOne(index, carryInTitle)` returns the chapter plus next carry title.
+ */
+export function buildSearchChaptersIdle(
+  count: number,
+  buildOne: (
+    index: number,
+    carryInTitle: string
+  ) => { chapter: SearchChapter; nextCarry: string },
+  onDone: (chapters: SearchChapter[]) => void
+): () => void {
+  const out: SearchChapter[] = []
+  let i = 0
+  let carry = ''
+  let finished = false
+  return runIdleSlices(() => {
+    if (finished) return false
+    if (count === 0) {
+      finished = true
+      onDone(out)
+      return false
+    }
+    const { chapter, nextCarry } = buildOne(i, carry)
+    out.push(chapter)
+    carry = nextCarry
+    i += 1
+    if (i >= count) {
+      finished = true
+      onDone(out)
+      return false
+    }
+    return true
+  })
+}
+
 export function jumpToSearchHit(
   scrollEl: HTMLElement,
   hit: SearchHit

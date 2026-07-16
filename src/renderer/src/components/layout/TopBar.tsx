@@ -9,12 +9,16 @@ interface Props {
 
 export default function TopBar({ onOpenSettings }: Props) {
   const { t } = useI18n()
-  const {
-    currentView,
-    leftSidebarOpen, leftSidebarTab, toggleLeftSidebar,
-    rightSidebarOpen, toggleRightSidebar
-  } = useAppStore()
-  const { isExpanded, setExpanded, setShowMiniPlayer, isPlaying } = useMusicStore()
+  const currentView = useAppStore((s) => s.currentView)
+  const leftSidebarOpen = useAppStore((s) => s.leftSidebarOpen)
+  const leftSidebarTab = useAppStore((s) => s.leftSidebarTab)
+  const toggleLeftSidebar = useAppStore((s) => s.toggleLeftSidebar)
+  const rightSidebarOpen = useAppStore((s) => s.rightSidebarOpen)
+  const toggleRightSidebar = useAppStore((s) => s.toggleRightSidebar)
+  const isExpanded = useMusicStore((s) => s.isExpanded)
+  const setExpanded = useMusicStore((s) => s.setExpanded)
+  const setShowMiniPlayer = useMusicStore((s) => s.setShowMiniPlayer)
+  const isPlaying = useMusicStore((s) => s.isPlaying)
 
   return (
     <header className={`h-12 flex items-center justify-between px-4 no-select chrome-border-b ${

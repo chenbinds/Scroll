@@ -7,7 +7,8 @@ import TypographyPanel from './TypographyPanel'
 
 export default function ReaderThemeBar() {
   const { t } = useI18n()
-  const { readingFont, setReadingFont } = useAppStore()
+  const readingFont = useAppStore((s) => s.readingFont)
+  const setReadingFont = useAppStore((s) => s.setReadingFont)
   const fontKeys = Object.keys(FONTS) as FontKey[]
 
   return (

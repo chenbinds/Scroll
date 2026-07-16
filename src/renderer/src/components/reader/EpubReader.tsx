@@ -17,7 +17,7 @@ import { shouldIgnoreReaderShortcut } from '../../lib/readerShortcuts'
 import { readScrollPercent, restoreScrollPercent } from '../../lib/scrollProgress'
 import { readTextOffsetAtView, restoreScrollByTextOffset } from '../../lib/readingAnchor'
 import { useAnchorLayoutPin } from '../../lib/useAnchorLayoutPin'
-import { stripHtmlToPlain, buildTitleAnchors, flattenToc } from '../../lib/bookSearch'
+import { stripHtmlToPlain, buildTitleAnchors, flattenToc, buildSearchChaptersIdle } from '../../lib/bookSearch'
 import { useSearchHitNavigation } from '../../lib/useSearchHitNavigation'
 import { attachReaderLinkInterceptor } from '../../lib/readerLinkNavigation'
 
@@ -96,6 +96,9 @@ export default function EpubReader({
     return () => { useAnnotationStore.getState().reset() }
   }, [currentBook?.id, currentBook?.format])
 
+  const onProgressRef = useRef(onProgress)
+  onProgressRef.current = onProgress
+
   const flushProgress = useCallback(() => {
     const el = contentRef.current
     if (!el || !epubContent) return
@@ -111,8 +114,8 @@ export default function EpubReader({
       if (rect.top <= viewTop) currentIdx = Number((ch as HTMLElement).dataset.chapter) || 0
       else break
     }
-    onProgress?.(currentIdx, epubContent.spine.length, pct, textOffset)
-  }, [epubContent, onProgress])
+    onProgressRef.current?.(currentIdx, epubContent.spine.length, pct, textOffset)
+  }, [epubContent])
 
   const flushProgressRef = useRef(flushProgress)
   flushProgressRef.current = flushProgress
@@ -186,38 +189,48 @@ export default function EpubReader({
     return () => { cancelled = true }
   }, [filePath])
 
-  // Build in-book search index from spine HTML (same body text as renderer)
+  // Build search index in idle slices — sync DOMParser×N chapters was freezing UI for seconds
   useEffect(() => {
     if (!epubContent) return
     const flatToc = flattenToc(epubContent.toc)
-    let carryInTitle = ''
-    const chapters = epubContent.spine.map((item, i) => {
-      const html = extractBody(epubContent.files.get(item.href) || '')
-      const tocForSpine = flatToc.filter((t) => t.spineIndex === i)
-      const titleAnchors = buildTitleAnchors(html, {
-        tocForSpine: tocForSpine.map((t) => ({ label: t.label, href: t.href })),
-        carryInTitle: carryInTitle || undefined
-      })
-      const plainText = stripHtmlToPlain(html)
-      const fallback =
-        titleAnchors.find((a) => a.offset === 0)?.title ||
-        titleAnchors[0]?.title ||
-        tocForSpine[0]?.label ||
-        item.href
-      // Next file's preamble inherits last section of this file
-      if (titleAnchors.length > 0) {
-        carryInTitle = titleAnchors[titleAnchors.length - 1].title
-      } else if (tocForSpine.length > 0) {
-        carryInTitle = tocForSpine[tocForSpine.length - 1].label
+    const spine = epubContent.spine
+    const files = epubContent.files
+    return buildSearchChaptersIdle(
+      spine.length,
+      (i, carryInTitle) => {
+        const item = spine[i]
+        const html = extractBody(files.get(item.href) || '')
+        const tocForSpine = flatToc.filter((t) => t.spineIndex === i)
+        const titleAnchors = buildTitleAnchors(html, {
+          tocForSpine: tocForSpine.map((t) => ({ label: t.label, href: t.href })),
+          carryInTitle: carryInTitle || undefined
+        })
+        const plainText = stripHtmlToPlain(html)
+        const fallback =
+          titleAnchors.find((a) => a.offset === 0)?.title ||
+          titleAnchors[0]?.title ||
+          tocForSpine[0]?.label ||
+          item.href
+        let nextCarry = carryInTitle
+        if (titleAnchors.length > 0) {
+          nextCarry = titleAnchors[titleAnchors.length - 1].title
+        } else if (tocForSpine.length > 0) {
+          nextCarry = tocForSpine[tocForSpine.length - 1].label
+        }
+        return {
+          chapter: {
+            chapterIndex: i,
+            title: fallback,
+            plainText,
+            titleAnchors
+          },
+          nextCarry
+        }
+      },
+      (chapters) => {
+        useAppStore.getState().setSearchChapters(chapters)
       }
-      return {
-        chapterIndex: i,
-        title: fallback,
-        plainText,
-        titleAnchors
-      }
-    })
-    useAppStore.getState().setSearchChapters(chapters)
+    )
   }, [epubContent])
 
   // Restore reading position (text offset preferred; percent / chapter fallback)
@@ -306,7 +319,7 @@ export default function EpubReader({
         if (rect.top <= viewTop) currentIdx = Number((ch as HTMLElement).dataset.chapter) || 0
         else break
       }
-      onProgress?.(currentIdx, epubContent.spine.length, pct, textOffset)
+      onProgressRef.current?.(currentIdx, epubContent.spine.length, pct, textOffset)
     }
 
     const onScroll = () => {
@@ -314,7 +327,7 @@ export default function EpubReader({
     }
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
-  }, [epubContent, onProgress])
+  }, [epubContent])
 
   // Bookmark navigation (legacy percent — prefer textOffset via useAnchorLayoutPin)
   const navigateToPercent = useAppStore((s) => s.navigateToPercent)

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, startTransition } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useI18n } from '../../lib/i18n'
@@ -12,7 +12,8 @@ interface Props {
 
 export default function ThemeSelect({ variant = 'toolbar' }: Props) {
   const { t } = useI18n()
-  const { readingTheme, setReadingTheme } = useAppStore()
+  const readingTheme = useAppStore((s) => s.readingTheme)
+  const setReadingTheme = useAppStore((s) => s.setReadingTheme)
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const themeKeys = Object.keys(THEMES) as ThemeKey[]
@@ -83,8 +84,9 @@ export default function ThemeSelect({ variant = 'toolbar' }: Props) {
                 role="option"
                 aria-selected={active}
                 onClick={() => {
-                  setReadingTheme(key)
                   setOpen(false)
+                  // Apply theme after dropdown closes so click feels instant
+                  startTransition(() => setReadingTheme(key))
                 }}
                 className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-xs transition-colors
                   ${active

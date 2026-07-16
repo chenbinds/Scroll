@@ -275,14 +275,29 @@ export const useAppStore = create<AppState>((set, get) => ({
   removeBook: (id) => set((s) => ({ books: s.books.filter((b) => b.id !== id) })),
   updateBookProgress: (id, progress, currentPage, progressOffset) =>
     set((s) => {
-      const patch: Partial<Book> = { progress, currentPage, lastReadAt: Date.now() }
+      const cur = s.currentBook?.id === id ? s.currentBook : s.books.find((b) => b.id === id)
+      if (!cur) return s
+      const nextOffset =
+        progressOffset != null && progressOffset >= 0 ? progressOffset : cur.progressOffset
+      // Skip no-op updates (scroll fires often) — keeps React tree cool
+      if (
+        Math.abs(cur.progress - progress) < 0.35 &&
+        cur.currentPage === currentPage &&
+        (nextOffset == null || cur.progressOffset === nextOffset)
+      ) {
+        return s
+      }
+      const patch: Partial<Book> = {
+        progress,
+        currentPage,
+        lastReadAt: Date.now()
+      }
       if (progressOffset != null && progressOffset >= 0) {
         patch.progressOffset = progressOffset
       }
+      // Do NOT re-sort on every scroll — sorting belongs to openBook / addBook
       return {
-        books: sortBooksByRecent(
-          s.books.map((b) => (b.id === id ? { ...b, ...patch } : b))
-        ),
+        books: s.books.map((b) => (b.id === id ? { ...b, ...patch } : b)),
         currentBook:
           s.currentBook?.id === id ? { ...s.currentBook, ...patch } : s.currentBook
       }

@@ -12,7 +12,7 @@ import { shouldIgnoreReaderShortcut } from '../../lib/readerShortcuts'
 import { readScrollPercent, restoreScrollPercent } from '../../lib/scrollProgress'
 import { readTextOffsetAtView, restoreScrollByTextOffset } from '../../lib/readingAnchor'
 import { useAnchorLayoutPin } from '../../lib/useAnchorLayoutPin'
-import { stripHtmlToPlain, buildTitleAnchors } from '../../lib/bookSearch'
+import { stripHtmlToPlain, buildTitleAnchors, buildSearchChaptersIdle } from '../../lib/bookSearch'
 import { useSearchHitNavigation } from '../../lib/useSearchHitNavigation'
 import { attachReaderLinkInterceptor } from '../../lib/readerLinkNavigation'
 import AnnotationToolbar from './annotation/AnnotationToolbar'
@@ -89,6 +89,9 @@ export default function MobiReader({
     return () => { useAnnotationStore.getState().reset() }
   }, [currentBook?.id, currentBook?.format])
 
+  const onProgressRef = useRef(onProgress)
+  onProgressRef.current = onProgress
+
   const flushProgress = useCallback(() => {
     const el = contentRef.current
     if (!el || chapters.length === 0) return
@@ -104,8 +107,8 @@ export default function MobiReader({
       if (rect.top <= viewTop) currentIdx = Number((sec as HTMLElement).dataset.chapter) || 0
       else break
     }
-    onProgress?.(currentIdx, chapters.length, pct, textOffset)
-  }, [chapters, onProgress])
+    onProgressRef.current?.(currentIdx, chapters.length, pct, textOffset)
+  }, [chapters])
 
   const flushProgressRef = useRef(flushProgress)
   flushProgressRef.current = flushProgress
@@ -201,25 +204,29 @@ export default function MobiReader({
 
   useEffect(() => {
     if (chapters.length === 0) return
-    let carryIn = ''
-    useAppStore.getState().setSearchChapters(
-      chapters.map((ch, i) => {
+    return buildSearchChaptersIdle(
+      chapters.length,
+      (i, carryIn) => {
+        const ch = chapters[i]
         const titleAnchors = buildTitleAnchors(ch.html, {
           tocForSpine: [{ label: ch.title, href: '' }],
           carryInTitle: carryIn || undefined
         })
-        if (titleAnchors.length > 0) {
-          carryIn = titleAnchors[titleAnchors.length - 1].title
-        } else {
-          carryIn = ch.title
-        }
+        const nextCarry =
+          titleAnchors.length > 0 ? titleAnchors[titleAnchors.length - 1].title : ch.title
         return {
-          chapterIndex: i,
-          title: ch.title,
-          plainText: stripHtmlToPlain(ch.html),
-          titleAnchors
+          chapter: {
+            chapterIndex: i,
+            title: ch.title,
+            plainText: stripHtmlToPlain(ch.html),
+            titleAnchors
+          },
+          nextCarry
         }
-      })
+      },
+      (built) => {
+        useAppStore.getState().setSearchChapters(built)
+      }
     )
   }, [chapters])
 
@@ -277,7 +284,7 @@ export default function MobiReader({
         if (rect.top <= viewTop) currentIdx = Number((sec as HTMLElement).dataset.chapter) || 0
         else break
       }
-      onProgress?.(currentIdx, chapters.length, pct, textOffset)
+      onProgressRef.current?.(currentIdx, chapters.length, pct, textOffset)
     }
 
     const onScroll = () => {
@@ -285,7 +292,7 @@ export default function MobiReader({
     }
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
-  }, [loading, chapters, onProgress])
+  }, [loading, chapters])
 
   // Bookmark navigation (legacy percent)
   const navigateToPercent = useAppStore((s) => s.navigateToPercent)

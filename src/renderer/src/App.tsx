@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense, useMemo, startTransition } from 'react'
 import AppShell from './components/layout/AppShell'
-import { useAppStore } from './stores/appStore'
+import { useAppStore, type Book } from './stores/appStore'
 import { useAnnotationStore } from './stores/annotationStore'
 import { getThemeCssVars } from './lib/readingTheme'
 import { cleanBookTitle } from './lib/bookTitle'
@@ -44,17 +44,160 @@ function LibraryFallback() {
   )
 }
 
+/** Freeze open-book initials so scroll progress does not remount the reader. */
+function ActiveReader({ book }: { book: Book }) {
+  const setCurrentView = useAppStore((s) => s.setCurrentView)
+  const initials = useMemo(
+    () => ({
+      chapter: book.currentPage || 0,
+      progress: book.progress || undefined,
+      textOffset: book.progressOffset
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only at open
+    [book.id]
+  )
+
+  const onClose = useCallback(() => {
+    setCurrentView('library')
+  }, [setCurrentView])
+
+  const onProgressContinuous = useCallback(
+    (chapterIndex: number, _count: number, progress: number, textOffset?: number) => {
+      const st = useAppStore.getState()
+      st.updateBookProgress(book.id, progress, chapterIndex, textOffset)
+      st.setReadingPosition({
+        chapter: String(chapterIndex),
+        page: chapterIndex,
+        percent: Math.round(progress),
+        textOffset
+      })
+    },
+    [book.id]
+  )
+
+  const onProgressTxt = useCallback(
+    (pct: number, textOffset?: number) => {
+      const st = useAppStore.getState()
+      st.updateBookProgress(book.id, pct, 0, textOffset)
+      st.setReadingPosition({ percent: Math.round(pct), textOffset })
+    },
+    [book.id]
+  )
+
+  const onPageChange = useCallback(
+    (page: number, total: number) => {
+      const progress = Math.round((page / total) * 100)
+      const st = useAppStore.getState()
+      st.updateBookProgress(book.id, progress, page)
+      st.setReadingPosition({ page, percent: progress })
+    },
+    [book.id]
+  )
+
+  const onTocReady = useCallback((toc: any[]) => {
+    useAppStore.getState().setToc(toc)
+  }, [])
+
+  useEffect(() => {
+    const st = useAppStore.getState()
+    if (!st.aiContext.bookTitle) {
+      st.setAiContext({ bookTitle: book.title })
+    }
+  }, [book.id, book.title])
+
+  const format = book.format.toUpperCase()
+
+  switch (format) {
+    case 'PDF':
+      return (
+        <PdfReader
+          filePath={book.path}
+          onClose={onClose}
+          onPageChange={onPageChange}
+          initialPage={initials.chapter || undefined}
+        />
+      )
+    case 'EPUB':
+      return (
+        <EpubReader
+          filePath={book.path}
+          onClose={onClose}
+          initialChapterIndex={initials.chapter}
+          initialProgress={initials.progress}
+          initialTextOffset={initials.textOffset}
+          onProgress={onProgressContinuous}
+          onTocReady={onTocReady}
+        />
+      )
+    case 'TXT':
+    case 'MD':
+    case 'MARKDOWN':
+      return (
+        <TxtReader
+          filePath={book.path}
+          onClose={onClose}
+          initialProgress={initials.progress}
+          initialTextOffset={initials.textOffset}
+          onProgress={onProgressTxt}
+        />
+      )
+    case 'MOBI':
+    case 'AZW':
+    case 'AZW3':
+      return (
+        <MobiReader
+          filePath={book.path}
+          onClose={onClose}
+          initialProgress={initials.progress}
+          initialTextOffset={initials.textOffset}
+          onProgress={onProgressContinuous}
+          onTocReady={onTocReady}
+        />
+      )
+    case 'CBZ':
+    case 'CBR':
+      return (
+        <ComicReader
+          filePath={book.path}
+          format={format as 'CBZ' | 'CBR'}
+          onClose={onClose}
+          onPageChange={onPageChange}
+          initialPage={initials.chapter || undefined}
+        />
+      )
+    default:
+      return <ReaderView book={book} />
+  }
+}
+
 export default function App() {
-  const { currentView, currentBook, darkMode, setCurrentView, updateBookProgress } = useAppStore()
+  const currentView = useAppStore((s) => s.currentView)
+  const currentBookId = useAppStore((s) => s.currentBook?.id ?? null)
+  const currentBookPath = useAppStore((s) => s.currentBook?.path)
+  const currentBookFormat = useAppStore((s) => s.currentBook?.format)
+  const currentBookTitle = useAppStore((s) => s.currentBook?.title)
+  const darkMode = useAppStore((s) => s.darkMode)
+  const setCurrentView = useAppStore((s) => s.setCurrentView)
   const [showSettings, setShowSettings] = useState(false)
   const [libraryReady, setLibraryReady] = useState(isBootstrapHydrated())
 
+  // Stable book snapshot for reader mount (path/format/title); progress lives in store
+  const readerBook = useMemo(() => {
+    if (!currentBookId || !currentBookPath || !currentBookFormat) return null
+    const live = useAppStore.getState().currentBook
+    if (!live || live.id !== currentBookId) return null
+    return live
+  }, [currentBookId, currentBookPath, currentBookFormat, currentBookTitle])
+
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', darkMode)
-    window.scrollAPI.setBackgroundColor(darkMode ? '#111827' : '#f8fafc').catch(() => {})
+    // Defer dark class — toggling it on a full EPUB DOM is expensive
+    const id = requestAnimationFrame(() => {
+      document.documentElement.classList.toggle('dark', darkMode)
+      window.scrollAPI.setBackgroundColor(darkMode ? '#111827' : '#f8fafc').catch(() => {})
+    })
+    return () => cancelAnimationFrame(id)
   }, [darkMode])
 
-  // Unified leave: window X → same React dialog as 返回书架
   useEffect(() => {
     return window.scrollAPI.onCloseRequested(() => {
       const canLeave = useAnnotationStore.getState().requestLeave('quit')
@@ -91,17 +234,18 @@ export default function App() {
   const readingParagraphGap = useAppStore((s) => s.readingParagraphGap)
   const readingPageMargin = useAppStore((s) => s.readingPageMargin)
   useEffect(() => {
-    const vars = getThemeCssVars(readingTheme, readingFont)
-    const root = document.documentElement
-    for (const [key, value] of Object.entries(vars)) {
-      root.style.setProperty(key, value)
-    }
-    root.style.setProperty('--reader-line-height', String(readingLineHeight))
-    root.style.setProperty('--reader-paragraph-gap', `${readingParagraphGap}rem`)
-    root.style.setProperty('--reader-page-margin', `${readingPageMargin}rem`)
+    startTransition(() => {
+      const vars = getThemeCssVars(readingTheme, readingFont)
+      const root = document.documentElement
+      for (const [key, value] of Object.entries(vars)) {
+        root.style.setProperty(key, value)
+      }
+      root.style.setProperty('--reader-line-height', String(readingLineHeight))
+      root.style.setProperty('--reader-paragraph-gap', `${readingParagraphGap}rem`)
+      root.style.setProperty('--reader-page-margin', `${readingPageMargin}rem`)
+    })
   }, [readingTheme, readingFont, readingLineHeight, readingParagraphGap, readingPageMargin])
 
-  // Fallback bootstrap if hydrate ran before scrollAPI (HMR / edge cases)
   useEffect(() => {
     if (libraryReady) return
     const t0 = performance.now()
@@ -137,20 +281,58 @@ export default function App() {
     return () => { cancelled = true }
   }, [libraryReady])
 
+  // Prefetch lazy chunks after first paint so first click is not a code-load stall
+  useEffect(() => {
+    if (!libraryReady) return
+    const warm = () => {
+      void import('./components/library/LibraryView')
+      void import('./components/layout/LeftSidebar')
+      void import('./components/layout/RightSidebar')
+      void import('./components/reader/EpubReader')
+      void import('./components/reader/MobiReader')
+      void import('./components/reader/PdfReader')
+      void import('./components/reader/TxtReader')
+      void import('./components/layout/SettingsDialog')
+      void import('./components/music/MusicPlayer')
+    }
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number
+      cancelIdleCallback?: (id: number) => void
+    }
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(warm, { timeout: 1800 })
+      return () => w.cancelIdleCallback?.(id)
+    }
+    const t = window.setTimeout(warm, 400)
+    return () => clearTimeout(t)
+  }, [libraryReady])
+
+  // Persist settings without re-rendering App on every books[] tick
   const readerFontSize = useAppStore((s) => s.readerFontSize)
   useEffect(() => {
     if (!libraryReady) return
     window.scrollAPI.storage.set('readerFontSize', readerFontSize).catch(() => {})
   }, [readerFontSize, libraryReady])
 
-  const { books } = useAppStore()
   useEffect(() => {
-    if (!libraryReady || books.length === 0) return
-    const timer = setTimeout(() => {
-      window.scrollAPI.storage.set('books', books).catch(() => {})
-    }, 800)
-    return () => clearTimeout(timer)
-  }, [books, libraryReady])
+    if (!libraryReady) return
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let prev = useAppStore.getState().books
+    const unsub = useAppStore.subscribe((state) => {
+      if (state.books === prev) return
+      prev = state.books
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        const books = useAppStore.getState().books
+        if (books.length === 0) return
+        window.scrollAPI.storage.set('books', books).catch(() => {})
+      }, 1200)
+    })
+    return () => {
+      unsub()
+      if (timer) clearTimeout(timer)
+    }
+  }, [libraryReady])
 
   const bookmarksByBook = useAppStore((s) => s.bookmarksByBook)
   useEffect(() => {
@@ -161,7 +343,7 @@ export default function App() {
     return () => clearTimeout(timer)
   }, [bookmarksByBook, libraryReady])
 
-  const { aiConfig } = useAppStore()
+  const aiConfig = useAppStore((s) => s.aiConfig)
   useEffect(() => {
     if (!libraryReady) return
     if (aiConfig.apiKey) window.scrollAPI.storage.set('aiConfig', aiConfig).catch(() => {})
@@ -198,15 +380,16 @@ export default function App() {
   }, [readingPageMargin, libraryReady])
 
   useEffect(() => {
-    if (!currentBook) return
-    const format = currentBook.format.toUpperCase()
+    if (!currentBookId) return
+    const book = useAppStore.getState().currentBook
+    if (!book) return
+    const format = book.format.toUpperCase()
     if (!TOC_FORMATS.has(format)) {
       const st = useAppStore.getState()
       if (st.leftSidebarOpen) st.toggleLeftSidebar(st.leftSidebarTab)
     }
-  }, [currentBook])
+  }, [currentBookId])
 
-  // Leave immersive when leaving reader
   useEffect(() => {
     if (currentView !== 'reader') {
       useAppStore.getState().setReaderImmersive(false)
@@ -214,20 +397,11 @@ export default function App() {
   }, [currentView])
 
   useEffect(() => {
-    if (currentView !== 'reader' || !currentBook) return
+    if (currentView !== 'reader' || !currentBookId) return
     return () => {
-      // Esc / 窗口切换离开时同步落盘（按钮离开也会再 flush 一次，无害）
       void window.scrollAPI.storage.set('books', useAppStore.getState().books)
     }
-  }, [currentView, currentBook?.id])
-
-  const handlePageChange = useCallback((page: number, total: number) => {
-    if (currentBook) {
-      const progress = Math.round((page / total) * 100)
-      updateBookProgress(currentBook.id, progress, page)
-      useAppStore.getState().setReadingPosition({ page, percent: progress })
-    }
-  }, [currentBook, updateBookProgress])
+  }, [currentView, currentBookId])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -245,13 +419,11 @@ export default function App() {
           return
         }
         const store = useAnnotationStore.getState()
-        // Leave dialog open → Esc cancels (same as 取消)
         if (store.pendingLeave) {
           store.cancelLeave()
           void window.scrollAPI.cancelClose()
           return
         }
-        // Polyline/polygon draft → Esc cancels draft only (Phase S leave still via 返回/X)
         if (store.hasClickDraft) return
         const canLeave = store.requestLeave('library')
         if (canLeave) {
@@ -264,80 +436,6 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [currentView, setCurrentView])
 
-  const renderReader = () => {
-    if (!currentBook) return null
-
-    if (!useAppStore.getState().aiContext.bookTitle) {
-      useAppStore.getState().setAiContext({ bookTitle: currentBook.title })
-    }
-
-    switch (currentBook.format.toUpperCase()) {
-      case 'PDF':
-        return <PdfReader filePath={currentBook.path} onClose={() => setCurrentView('library')}
-          onPageChange={handlePageChange}
-          initialPage={currentBook.currentPage || undefined} />
-
-      case 'EPUB':
-        return <EpubReader filePath={currentBook.path} onClose={() => setCurrentView('library')}
-          initialChapterIndex={currentBook.currentPage || 0}
-          initialProgress={currentBook.progress || undefined}
-          initialTextOffset={currentBook.progressOffset}
-          onProgress={(chapterIndex, _count, progress, textOffset) => {
-            updateBookProgress(currentBook.id, progress, chapterIndex, textOffset)
-            useAppStore.getState().setReadingPosition({
-              chapter: String(chapterIndex),
-              page: chapterIndex,
-              percent: Math.round(progress),
-              textOffset
-            })
-          }}
-          onTocReady={(toc) => { useAppStore.getState().setToc(toc) }} />
-
-      case 'TXT':
-      case 'MD':
-      case 'MARKDOWN':
-        return <TxtReader filePath={currentBook.path} onClose={() => setCurrentView('library')}
-          initialProgress={currentBook.progress || undefined}
-          initialTextOffset={currentBook.progressOffset}
-          onProgress={(pct, textOffset) => {
-            updateBookProgress(currentBook.id, pct, 0, textOffset)
-            useAppStore.getState().setReadingPosition({ percent: Math.round(pct), textOffset })
-          }} />
-
-      case 'MOBI':
-      case 'AZW':
-      case 'AZW3':
-        return <MobiReader filePath={currentBook.path} onClose={() => setCurrentView('library')}
-          initialProgress={currentBook.progress || undefined}
-          initialTextOffset={currentBook.progressOffset}
-          onProgress={(chapterIndex, _count, progress, textOffset) => {
-            updateBookProgress(currentBook.id, progress, chapterIndex, textOffset)
-            useAppStore.getState().setReadingPosition({
-              chapter: String(chapterIndex),
-              page: chapterIndex,
-              percent: Math.round(progress),
-              textOffset
-            })
-          }}
-          onTocReady={(toc) => { useAppStore.getState().setToc(toc) }}
-          />
-
-      case 'CBZ':
-      case 'CBR':
-        return <ComicReader filePath={currentBook.path} format={currentBook.format.toUpperCase() as 'CBZ' | 'CBR'}
-          onClose={() => setCurrentView('library')}
-          onPageChange={(page, total) => {
-            const progress = Math.round((page / total) * 100)
-            updateBookProgress(currentBook.id, progress, page)
-            useAppStore.getState().setReadingPosition({ page, percent: progress })
-          }}
-          initialPage={currentBook.currentPage || undefined} />
-
-      default:
-        return <ReaderView book={currentBook} />
-    }
-  }
-
   return (
     <AppShell onOpenSettings={() => setShowSettings(true)}>
       {currentView === 'library' ? (
@@ -345,7 +443,9 @@ export default function App() {
           <LibraryView libraryReady={libraryReady} />
         </Suspense>
       ) : (
-        <Suspense fallback={<ReaderFallback />}>{renderReader()}</Suspense>
+        <Suspense fallback={<ReaderFallback />}>
+          {readerBook ? <ActiveReader key={readerBook.id} book={readerBook} /> : null}
+        </Suspense>
       )}
       {showSettings && (
         <Suspense fallback={null}>
