@@ -35,6 +35,13 @@ const zh = {
   'library.manualRatingInvalid': '请输入 0–10 之间的数字',
   'library.refreshCover': '刷新封面',
   'library.coverFailed': '封面提取失败',
+  'library.fileMissing.title': '找不到原文件',
+  'library.fileMissing.body': '这本书的文件已被移动或删除。请重新选择文件，或从书架移除。',
+  'library.fileMissing.relocate': '重新选择文件',
+  'library.fileMissing.remove': '从书架移除',
+  'library.fileMissing.cancel': '取消',
+  'library.importCopyFailed': '导入失败：无法复制文件到书架目录',
+  'library.relocateFailed': '重新定位失败，请换一个文件再试',
 
   // Bookmarks panel
   'bookmarks.addPosition': '添加位置书签',
@@ -213,6 +220,7 @@ const zh = {
   'common.loading': '加载中...',
 
   // Error
+  'error.fileMissing': '找不到电子书文件（可能已被移动或删除）',
   'error.preloadNotLoaded': '应用预加载未完成。\n\n请关闭并重新打开应用。\n如果问题持续，请重新运行 install.bat。'
 }
 

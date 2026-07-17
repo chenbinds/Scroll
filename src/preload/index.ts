@@ -39,6 +39,19 @@ contextBridge.exposeInMainWorld('scrollAPI', {
   readFile: (filePath: string) => ipcRenderer.invoke('file:read', filePath),
   readPath: (filePath: string) => ipcRenderer.invoke('file:readPath', filePath),
 
+  importBookCopy: (opts: { sourcePath: string; bookId: string }) =>
+    ipcRenderer.invoke('books:importCopy', opts) as Promise<
+      { ok: true; path: string } | { ok: false; error: string }
+    >,
+  relocateBook: (opts: { sourcePath: string; bookId: string; previousPath?: string }) =>
+    ipcRenderer.invoke('books:relocate', opts) as Promise<
+      { ok: true; path: string } | { ok: false; error: string }
+    >,
+  deleteBookFile: (filePath: string) =>
+    ipcRenderer.invoke('books:deleteFile', filePath) as Promise<boolean>,
+  isLibraryBookPath: (filePath: string) =>
+    ipcRenderer.invoke('books:isLibraryPath', filePath) as Promise<boolean>,
+
   getDataPath: () => ipcRenderer.invoke('app:getDataPath'),
   setBackgroundColor: (color: string) => ipcRenderer.invoke('window:setBackgroundColor', color),
   confirmClose: () => ipcRenderer.invoke('window:confirm-close'),
@@ -115,6 +128,17 @@ export interface ScrollAPI {
   openExternal: (url: string) => Promise<boolean>
   readFile: (filePath: string) => Promise<string>
   readPath: (filePath: string) => Promise<string | null>
+  importBookCopy: (opts: {
+    sourcePath: string
+    bookId: string
+  }) => Promise<{ ok: true; path: string } | { ok: false; error: string }>
+  relocateBook: (opts: {
+    sourcePath: string
+    bookId: string
+    previousPath?: string
+  }) => Promise<{ ok: true; path: string } | { ok: false; error: string }>
+  deleteBookFile: (filePath: string) => Promise<boolean>
+  isLibraryBookPath: (filePath: string) => Promise<boolean>
   getDataPath: () => Promise<string>
   setBackgroundColor: (color: string) => Promise<void>
   confirmClose: () => Promise<boolean>

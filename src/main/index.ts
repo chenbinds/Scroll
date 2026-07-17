@@ -12,6 +12,12 @@ import {
 } from './covers'
 import { searchDoubanBook } from './douban'
 import { bookStore, settingsStore, musicStore } from './storage'
+import {
+  importBookFile,
+  relocateBookFile,
+  deleteLibraryBookFile,
+  isLibraryBookPath
+} from './bookFiles'
 
 const bootStarted = Date.now()
 
@@ -197,6 +203,12 @@ ipcMain.handle(
 // 读取文件内容（用于 PDF/EPUB 等需要在渲染进程处理的格式）
 ipcMain.handle('file:read', async (_event, filePath: string) => {
   try {
+    if (typeof filePath !== 'string' || !filePath.trim()) {
+      throw new Error('FILE_MISSING')
+    }
+    if (!existsSync(filePath)) {
+      throw new Error('FILE_MISSING')
+    }
     const buffer = readFileSync(filePath)
     return buffer.toString('base64')
   } catch (error) {
@@ -208,6 +220,35 @@ ipcMain.handle('file:read', async (_event, filePath: string) => {
 ipcMain.handle('fs:pathExists', async (_event, filePath: string) => {
   if (typeof filePath !== 'string' || !filePath.trim()) return false
   return existsSync(filePath)
+})
+
+/** Copy imported ebook into UserData/books/ — shelf no longer depends on Downloads path */
+ipcMain.handle(
+  'books:importCopy',
+  async (_event, opts: { sourcePath: string; bookId: string }) => {
+    if (!opts?.sourcePath || !opts?.bookId) return { ok: false as const, error: 'invalid' as const }
+    return importBookFile(opts.sourcePath, opts.bookId)
+  }
+)
+
+/** Re-link a missing book: copy newly picked file into library folder */
+ipcMain.handle(
+  'books:relocate',
+  async (_event, opts: { sourcePath: string; bookId: string; previousPath?: string }) => {
+    if (!opts?.sourcePath || !opts?.bookId) return { ok: false as const, error: 'invalid' as const }
+    return relocateBookFile(opts.sourcePath, opts.bookId, opts.previousPath)
+  }
+)
+
+ipcMain.handle('books:deleteFile', async (_event, filePath: string) => {
+  if (typeof filePath !== 'string') return false
+  deleteLibraryBookFile(filePath)
+  return true
+})
+
+ipcMain.handle('books:isLibraryPath', async (_event, filePath: string) => {
+  if (typeof filePath !== 'string') return false
+  return isLibraryBookPath(filePath)
 })
 
 ipcMain.handle('shell:openExternal', async (_event, url: string) => {

@@ -35,6 +35,13 @@ const en: Translations = {
   'library.manualRatingInvalid': 'Enter a number between 0 and 10',
   'library.refreshCover': 'Refresh cover',
   'library.coverFailed': 'Cover extraction failed',
+  'library.fileMissing.title': 'File not found',
+  'library.fileMissing.body': 'This book’s file was moved or deleted. Pick the file again, or remove it from the library.',
+  'library.fileMissing.relocate': 'Locate file',
+  'library.fileMissing.remove': 'Remove from library',
+  'library.fileMissing.cancel': 'Cancel',
+  'library.importCopyFailed': 'Import failed: could not copy into the library folder',
+  'library.relocateFailed': 'Could not relocate the file. Try another file.',
 
   'bookmarks.addPosition': 'Add position bookmark',
   'bookmarks.positions': 'Position bookmarks',
@@ -203,6 +210,7 @@ const en: Translations = {
   'common.error': 'Error',
   'common.loading': 'Loading...',
 
+  'error.fileMissing': 'Ebook file not found (it may have been moved or deleted)',
   'error.preloadNotLoaded': 'App preload failed to load.\n\nPlease close and reopen the app.\nIf this persists, re-run install.bat.'
 }
 

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Book as BookIcon, Plus, FolderOpen, ExternalLink } from 'lucide-react'
 
 const ZLIBRARY_URL = 'https://zlib.ch'
@@ -32,6 +32,19 @@ async function fetchDoubanRating(
   return { error: info?.error ?? 'network' }
 }
 
+/** Ensure book file lives under UserData/books/ (copy if still on Downloads etc.). */
+async function ensureLibraryCopy(book: Book): Promise<Book> {
+  const inLib = await window.scrollAPI.isLibraryBookPath(book.path)
+  if (inLib) return book
+  const copied = await window.scrollAPI.importBookCopy({
+    sourcePath: book.path,
+    bookId: book.id
+  })
+  if (!copied.ok) return book
+  patchBook(book.id, { path: copied.path })
+  return { ...book, path: copied.path }
+}
+
 interface Props {
   libraryReady: boolean
 }
@@ -39,6 +52,7 @@ interface Props {
 export default function LibraryView({ libraryReady }: Props) {
   const { t } = useI18n()
   const { books, addBook, openBook, removeBook } = useAppStore()
+  const [missingBook, setMissingBook] = useState<Book | null>(null)
 
   const sortedBooks = useMemo(
     () =>
@@ -56,17 +70,27 @@ export default function LibraryView({ libraryReady }: Props) {
     const paths = await window.scrollAPI.openBookDialog()
     if (!paths || paths.length === 0) return
 
-    for (const path of paths) {
-      const fileName = path.split(/[\\/]/).pop() || 'Unknown'
+    for (const sourcePath of paths) {
+      const fileName = sourcePath.split(/[\\/]/).pop() || 'Unknown'
       const nameWithoutExt = fileName.replace(/\.[^.]+$/, '')
       const ext = fileName.split('.').pop()?.toLowerCase() || ''
+      const bookId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+
+      const copied = await window.scrollAPI.importBookCopy({
+        sourcePath,
+        bookId
+      })
+      if (!copied.ok) {
+        alert(t('library.importCopyFailed'))
+        continue
+      }
 
       const book: Book = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        id: bookId,
         title: cleanBookTitle(nameWithoutExt),
         author: t('library.unknownAuthor'),
         format: ext.toUpperCase(),
-        path,
+        path: copied.path,
         addedAt: Date.now(),
         lastReadAt: Date.now(),
         progress: 0,
@@ -76,31 +100,79 @@ export default function LibraryView({ libraryReady }: Props) {
 
       addBook(book)
 
-      // Douban: fetch once on import only
       fetchDoubanRating(book, t('library.unknownAuthor')).catch(() => {})
 
       const fmt = ext.toUpperCase()
       if (fmt === 'EPUB') {
-        window.scrollAPI.readPath(path).then(async (base64: string | null) => {
+        window.scrollAPI.readPath(copied.path).then(async (base64: string | null) => {
           if (!base64) return
           try {
             const { extractEpubCover } = await import('../../lib/epubParser')
             const coverUrl = await extractEpubCover(base64)
-            if (coverUrl) patchBook(book.id, { coverUrl: await compressCoverDataUrl(coverUrl) })
+            if (coverUrl) {
+              const compressed = await compressCoverDataUrl(coverUrl)
+              const ref = await window.scrollAPI.saveCover(book.id, compressed)
+              patchBook(book.id, { coverUrl: ref || compressed })
+            }
           } catch { /* ignore */ }
         }).catch(() => {})
       } else if (fmt === 'MOBI' || fmt === 'AZW' || fmt === 'AZW3') {
-        window.scrollAPI.readPath(path).then(async (base64: string | null) => {
+        window.scrollAPI.readPath(copied.path).then(async (base64: string | null) => {
           if (!base64) return
           try {
             const { extractMobiCover } = await import('../../lib/mobiParser')
             const coverUrl = await extractMobiCover(base64)
-            if (coverUrl) patchBook(book.id, { coverUrl })
+            if (coverUrl) {
+              const ref = await window.scrollAPI.saveCover(book.id, coverUrl)
+              patchBook(book.id, { coverUrl: ref || coverUrl })
+            }
           } catch { /* ignore */ }
         }).catch(() => {})
       }
     }
   }, [addBook, t])
+
+  const handleOpen = useCallback(async (book: Book) => {
+    const exists = await window.scrollAPI.pathExists(book.path)
+    if (!exists) {
+      setMissingBook(book)
+      return
+    }
+    const stable = await ensureLibraryCopy(book)
+    openBook(stable)
+  }, [openBook])
+
+  const handleDelete = useCallback(async (book: Book) => {
+    await window.scrollAPI.deleteBookFile(book.path)
+    removeBook(book.id)
+  }, [removeBook])
+
+  const handleRelocate = useCallback(async () => {
+    if (!missingBook) return
+    const paths = await window.scrollAPI.openBookDialog()
+    if (!paths || paths.length === 0) return
+    const sourcePath = paths[0]
+    const result = await window.scrollAPI.relocateBook({
+      sourcePath,
+      bookId: missingBook.id,
+      previousPath: missingBook.path
+    })
+    if (!result.ok) {
+      alert(t('library.relocateFailed'))
+      return
+    }
+    const updated = { ...missingBook, path: result.path }
+    patchBook(missingBook.id, { path: result.path })
+    setMissingBook(null)
+    openBook(updated)
+  }, [missingBook, openBook, t])
+
+  const handleRemoveMissing = useCallback(async () => {
+    if (!missingBook) return
+    await window.scrollAPI.deleteBookFile(missingBook.path)
+    removeBook(missingBook.id)
+    setMissingBook(null)
+  }, [missingBook, removeBook])
 
   const handleOpenZLibrary = useCallback(() => {
     void window.scrollAPI.openExternal(ZLIBRARY_URL)
@@ -115,6 +187,11 @@ export default function LibraryView({ libraryReady }: Props) {
   }, [])
 
   const handleRefreshCover = useCallback(async (book: Book) => {
+    const exists = await window.scrollAPI.pathExists(book.path)
+    if (!exists) {
+      setMissingBook(book)
+      throw new Error('missing')
+    }
     const base64 = await window.scrollAPI.readPath(book.path)
     if (!base64) throw new Error('read failed')
     const fmt = book.format.toUpperCase()
@@ -201,13 +278,60 @@ export default function LibraryView({ libraryReady }: Props) {
               <BookCard
                 key={book.id}
                 book={book}
-                onClick={() => openBook(book)}
-                onDelete={() => removeBook(book.id)}
+                onClick={() => { void handleOpen(book) }}
+                onDelete={() => { void handleDelete(book) }}
                 onRefreshRating={() => handleRefreshRating(book)}
                 onSetManualRating={(rating) => handleSetManualRating(book.id, rating)}
                 onRefreshCover={() => handleRefreshCover(book)}
               />
             ))}
+          </div>
+        </div>
+      )}
+
+      {missingBook && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setMissingBook(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl bg-white dark:bg-gray-900 shadow-xl border border-gray-200 dark:border-gray-700 p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+              {t('library.fileMissing.title')}
+            </h3>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              {t('library.fileMissing.body')}
+            </p>
+            <p className="mt-2 text-xs text-gray-400 dark:text-gray-500 break-all">
+              {missingBook.title}
+              <br />
+              {missingBook.path}
+            </p>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setMissingBook(null)}
+                className="px-3 py-1.5 text-sm rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                {t('library.fileMissing.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={() => { void handleRemoveMissing() }}
+                className="px-3 py-1.5 text-sm rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+              >
+                {t('library.fileMissing.remove')}
+              </button>
+              <button
+                type="button"
+                onClick={() => { void handleRelocate() }}
+                className="px-3 py-1.5 text-sm rounded-lg bg-scroll-500 hover:bg-scroll-600 text-white"
+              >
+                {t('library.fileMissing.relocate')}
+              </button>
+            </div>
           </div>
         </div>
       )}

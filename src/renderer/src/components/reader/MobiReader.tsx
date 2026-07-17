@@ -15,6 +15,8 @@ import { useAnchorLayoutPin } from '../../lib/useAnchorLayoutPin'
 import { stripHtmlToPlain, buildTitleAnchors, buildSearchChaptersIdle } from '../../lib/bookSearch'
 import { useSearchHitNavigation } from '../../lib/useSearchHitNavigation'
 import { attachReaderLinkInterceptor } from '../../lib/readerLinkNavigation'
+import { fileLoadErrorMessage } from '../../lib/fileLoadError'
+import { useI18n } from '../../lib/i18n'
 import AnnotationToolbar from './annotation/AnnotationToolbar'
 import AnnotationOverlay from './annotation/AnnotationOverlay'
 import HighlightLayer from './annotation/HighlightLayer'
@@ -48,6 +50,7 @@ export default function MobiReader({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { fontSize, increaseFont, decreaseFont } = useReaderFontSize()
+  const { t } = useI18n()
   const [chapters, setChapters] = useState<MobiChapter[]>([])
   const contentRef = useRef<HTMLDivElement | null>(null)
   const hasRestoredRef = useRef(false)
@@ -190,8 +193,7 @@ export default function MobiReader({
       } catch (err) {
         if (cancelled) return
         console.error('MOBI load error:', err)
-        const msg = err instanceof Error ? (err.stack || err.message) : String(err)
-        setError('Failed to load MOBI: ' + msg)
+        setError(fileLoadErrorMessage(err, 'Failed to load MOBI'))
         setLoading(false)
       }
     }
@@ -381,9 +383,16 @@ export default function MobiReader({
 
           {error && (
             <div className="flex items-center justify-center h-full">
-              <div className="text-center text-red-500 px-4">
-                <p className="text-sm">Failed to load MOBI</p>
-                <p className="text-xs mt-1 text-red-400">{error}</p>
+              <div className="text-center text-red-500 px-4 max-w-md">
+                <p className="text-sm font-medium">
+                  {error === 'FILE_MISSING' ? t('error.fileMissing') : 'Failed to load MOBI'}
+                </p>
+                {error !== 'FILE_MISSING' && (
+                  <p className="text-xs mt-1 text-red-400 break-all">{error}</p>
+                )}
+                {error === 'FILE_MISSING' && (
+                  <p className="text-xs mt-3 chrome-muted">{t('library.fileMissing.body')}</p>
+                )}
               </div>
             </div>
           )}
