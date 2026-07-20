@@ -9,7 +9,7 @@ interface Props {
   scrollRef: React.RefObject<HTMLDivElement | null>
 }
 
-const MAX_TERM = 80
+const MAX_TERM = 2000
 
 export default function SelectionLookup({ scrollRef }: Props) {
   const { t } = useI18n()

@@ -52,8 +52,8 @@ Scroll/
 │           └── ...
 ├── scripts/            # pack.ps1、pack-release.ps1、README.dist.txt
 ├── tools/offline/      # 可选 builder 离线包（*.7z 不提交）
-├── Information/        # Handoff；Handoff_2026-07-14.md 为最新
-├── docs/               # 含 05-packaging.md
+├── Information/Handoff_2026-07-17.md 为最新
+├── docs/               # 含 05-packaging.md、06-troubleshooting.md
 ├── TODO.md
 ├── pack.bat            # 一键打包 → dist/*.zip
 ├── out/                # electron-vite 构建产物（gitignore）

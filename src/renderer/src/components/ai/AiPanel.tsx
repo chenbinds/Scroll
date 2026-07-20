@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Sparkles, AlertCircle, Trash2 } from 'lucide-react'
+import { Send, AlertCircle, Trash2 } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useI18n } from '../../lib/i18n'
 import { chatStream, type AiMessage } from '../../lib/aiService'
 import { loadAiSession, saveAiSession, clearAiSession, type AiSessionMessage } from '../../lib/aiSessionStorage'
+import { AiWelcomeIcon, detectAiProvider } from '../../lib/aiProviderIcon'
 
 interface ChatMessage extends AiSessionMessage {}
 
@@ -64,7 +65,8 @@ export default function AiPanel() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamingText])
 
-  const isConfigured = aiConfig.baseUrl && aiConfig.apiKey && aiConfig.model
+  const isConfigured = !!(aiConfig.baseUrl && aiConfig.apiKey && aiConfig.model)
+  const provider = isConfigured ? detectAiProvider(aiConfig) : null
 
   const buildContextMessages = useCallback((): AiMessage[] => {
     const ctx = useAppStore.getState().aiContext
@@ -203,7 +205,7 @@ export default function AiPanel() {
       <div className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin">
         {!isConfigured && messages.length === 0 && (
           <div className="text-center py-8">
-            <Sparkles size={32} className="mx-auto text-gray-300 dark:text-gray-600 mb-2" />
+            <AiWelcomeIcon configured={false} provider={null} />
             <p className="text-sm text-gray-400 dark:text-gray-500 mb-1">{t('ai.notConfigured')}</p>
             <p className="text-xs text-gray-400 dark:text-gray-600">{t('ai.notConfigured.desc')}</p>
           </div>
@@ -211,7 +213,7 @@ export default function AiPanel() {
 
         {isConfigured && messages.length === 0 && !streamingText && (
           <div className="text-center py-8">
-            <Sparkles size={32} className="mx-auto text-scroll-400 mb-2" />
+            <AiWelcomeIcon configured provider={provider} />
             <p className="text-sm text-gray-600 dark:text-gray-400">
               {t('ai.welcome')} ({aiConfig.name})
             </p>
