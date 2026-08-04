@@ -100,6 +100,9 @@ const en: Translations = {
   'lookup.loading': 'Looking up…',
   'lookup.failed': 'Lookup failed',
   'lookup.notConfigured': 'Configure AI in Settings first',
+  'lookup.resultPlaceholder': 'Edit the definition here…',
+  'lookup.save': 'Save as note',
+  'lookup.saved': 'Saved',
 
   'annotation.mark': 'Mark',
   'annotation.brush': 'Brush',

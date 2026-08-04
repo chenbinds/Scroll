@@ -103,6 +103,9 @@ const zh = {
   'lookup.loading': '查询中…',
   'lookup.failed': '查询失败',
   'lookup.notConfigured': '请先在设置中配置 AI',
+  'lookup.resultPlaceholder': '查义结果可在此编辑…',
+  'lookup.save': '保存为笔记',
+  'lookup.saved': '已保存',
 
   // Annotation
   'annotation.mark': '标记',
