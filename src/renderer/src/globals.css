@@ -189,6 +189,44 @@ html.reader-immersive .reader-frame {
 .reader-content h3 { font-weight: 600; font-size: 1.125rem; margin: 1.5rem 0 0.75rem; }
 
 .reader-content img { max-width: 100%; height: auto; margin: 1.25rem 0; }
+
+/*
+ * EPUB footnotes are often placed inline after noteref ("注") and hidden by the
+ * book's own CSS. We strip <style> in extractBody, so without this they leak
+ * into the reading flow (e.g. cite lines inserted mid-poem).
+ */
+.reader-content aside[epub\|type~="footnote"],
+.reader-content aside[epub\|type~="endnote"],
+.reader-content aside[epub\|type~="rearnote"],
+.reader-content [epub\|type~="footnote"],
+.reader-content [epub\|type~="endnote"],
+.reader-content [epub\|type~="rearnote"],
+.reader-content [role="doc-footnote"],
+.reader-content [role="doc-endnote"],
+.reader-content aside.footnote,
+.reader-content div.footnote,
+.reader-content section.footnote,
+.reader-content ol.footnote,
+.reader-content ul.footnote,
+.reader-content li.footnote,
+.reader-content p.footnote,
+.reader-content .duokan-footnote-content,
+.reader-content .footnote-content,
+.reader-content .footnote-item,
+.reader-content .kindle-footnote,
+.reader-content [data-scroll-footnote] {
+  display: none !important;
+}
+
+/* Keep noteref markers visible / tappable */
+.reader-content a[epub\|type~="noteref"],
+.reader-content a.duokan-footnote,
+.reader-content a.footnote-ref {
+  cursor: pointer;
+  color: var(--reader-accent, #4c6ef5);
+  text-decoration: none;
+}
+
 /* Small inline images (footnotes, icons) — keep inline, no block margins */
 .reader-content sup img,
 .reader-content sub img,

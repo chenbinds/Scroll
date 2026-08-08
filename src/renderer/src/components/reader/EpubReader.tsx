@@ -20,6 +20,7 @@ import { useAnchorLayoutPin } from '../../lib/useAnchorLayoutPin'
 import { stripHtmlToPlain, buildTitleAnchors, flattenToc, buildSearchChaptersIdle } from '../../lib/bookSearch'
 import { useSearchHitNavigation } from '../../lib/useSearchHitNavigation'
 import { attachReaderLinkInterceptor } from '../../lib/readerLinkNavigation'
+import { markInlineFootnotes } from '../../lib/epubFootnotes'
 import { fileLoadErrorMessage } from '../../lib/fileLoadError'
 import { useI18n } from '../../lib/i18n'
 
@@ -492,5 +493,5 @@ function extractBody(html: string): string {
 
   const bodyMatch = content.match(/<body[^>]*>([\s\S]*)<\/body>/i)
   if (bodyMatch) content = bodyMatch[1]
-  return content
+  return markInlineFootnotes(content)
 }

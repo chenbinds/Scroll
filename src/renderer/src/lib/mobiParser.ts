@@ -7,6 +7,7 @@ import { MOBI } from 'foliate-js/mobi.js'
 import { unzlibSync } from 'fflate'
 import { cleanBookTitle } from './bookTitle'
 import { compressCoverDataUrl } from './coverImage'
+import { markInlineFootnotes } from './epubFootnotes'
 
 export interface MobiChapter {
   title: string
@@ -77,7 +78,7 @@ function extractBodyHtml(docHtml: string): string {
     if (!body) return docHtml
     // Drop default injected stylesheets — reader chrome owns typography
     body.querySelectorAll('style').forEach((el) => el.remove())
-    return body.innerHTML
+    return markInlineFootnotes(body.innerHTML)
   } catch {
     return docHtml
   }
