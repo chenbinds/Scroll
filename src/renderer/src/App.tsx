@@ -47,15 +47,21 @@ function LibraryFallback() {
 /** Freeze open-book initials so scroll progress does not remount the reader. */
 function ActiveReader({ book }: { book: Book }) {
   const setCurrentView = useAppStore((s) => s.setCurrentView)
-  const initials = useMemo(
-    () => ({
-      chapter: book.currentPage || 0,
-      progress: book.progress || undefined,
-      textOffset: book.progressOffset
-    }),
+  const initials = useMemo(() => {
+    // Prefer shelf/currentBook snapshot at mount — App may hand a stale book prop
+    // when re-opening the same id without remounting the memoized readerBook.
+    const st = useAppStore.getState()
+    const latest =
+      (st.currentBook?.id === book.id ? st.currentBook : null) ||
+      st.books.find((b) => b.id === book.id) ||
+      book
+    return {
+      chapter: latest.currentPage || 0,
+      progress: latest.progress || undefined,
+      textOffset: latest.progressOffset
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only at open
-    [book.id]
-  )
+  }, [book.id])
 
   const onClose = useCallback(() => {
     setCurrentView('library')
@@ -181,13 +187,16 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [libraryReady, setLibraryReady] = useState(isBootstrapHydrated())
 
-  // Stable book snapshot for reader mount (path/format/title); progress lives in store
+  // Snapshot only when entering reader (include currentView). Same-book reopen
+  // must refresh — otherwise progress/progressOffset stay at the first-open values
+  // and restore falls back to chapter start.
   const readerBook = useMemo(() => {
+    if (currentView !== 'reader') return null
     if (!currentBookId || !currentBookPath || !currentBookFormat) return null
     const live = useAppStore.getState().currentBook
     if (!live || live.id !== currentBookId) return null
     return live
-  }, [currentBookId, currentBookPath, currentBookFormat, currentBookTitle])
+  }, [currentView, currentBookId, currentBookPath, currentBookFormat, currentBookTitle])
 
   useEffect(() => {
     // Defer dark class — toggling it on a full EPUB DOM is expensive
@@ -444,7 +453,9 @@ export default function App() {
         </Suspense>
       ) : (
         <Suspense fallback={<ReaderFallback />}>
-          {readerBook ? <ActiveReader key={readerBook.id} book={readerBook} /> : null}
+          {readerBook ? (
+            <ActiveReader key={`${readerBook.id}-${readerBook.lastReadAt}`} book={readerBook} />
+          ) : null}
         </Suspense>
       )}
       {showSettings && (

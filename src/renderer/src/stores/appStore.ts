@@ -246,12 +246,23 @@ export const useAppStore = create<AppState>((set, get) => ({
       bookmarksByBook = { ...bookmarksByBook, [s.currentBook.id]: s.bookmarks }
     }
     const now = Date.now()
-    const opened = { ...book, lastReadAt: now }
+    // Merge shelf record so progress / progressOffset survive reopen
+    const fromShelf = s.books.find((b) => b.id === book.id)
+    const base = fromShelf || book
+    const opened = {
+      ...base,
+      ...book,
+      path: book.path || base.path,
+      progress: book.progress ?? base.progress ?? 0,
+      currentPage: book.currentPage ?? base.currentPage ?? 0,
+      progressOffset: book.progressOffset ?? base.progressOffset,
+      lastReadAt: now
+    }
     set({
       currentBook: opened,
       currentView: 'reader',
       books: sortBooksByRecent(
-        s.books.map((b) => (b.id === book.id ? opened : b))
+        s.books.map((b) => (b.id === book.id ? { ...b, ...opened } : b))
       ),
       bookmarks: bookmarksByBook[book.id] ?? [],
       bookmarksByBook,
