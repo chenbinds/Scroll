@@ -27,7 +27,7 @@ registerCoverSchemePrivileged()
 let mainWindow: BrowserWindow | null = null
 /** When true, the next close event proceeds without prompting */
 let allowClose = false
-/** True while waiting for renderer leave dialog — ignore repeat X clicks */
+/** True while waiting for renderer leave dialog �?ignore repeat X clicks */
 let awaitingLeaveDecision = false
 
 function createWindow(): void {
@@ -39,11 +39,12 @@ function createWindow(): void {
     height: 800,
     minWidth: 800,
     minHeight: 600,
-    // Show immediately with HTML splash — don't wait for React
+    // Show immediately with HTML splash �?don't wait for React
     show: true,
     title: '卷轴 Scroll',
     autoHideMenuBar: true,
     backgroundColor: '#f8fafc',
+    icon: is.dev ? join(__dirname, '../../icon.png') : join(process.resourcesPath, 'icon.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -71,7 +72,7 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // Block in-page navigations that leave the SPA (e.g. EPUB <a href="ch1.xhtml"> → white screen)
+  // Block in-page navigations that leave the SPA (e.g. EPUB <a href="ch1.xhtml"> �?white screen)
   mainWindow.webContents.on('will-navigate', (event, url) => {
     const current = mainWindow?.webContents.getURL() || ''
     try {
@@ -105,7 +106,7 @@ ipcMain.handle('window:setBackgroundColor', (_event, color: string) => {
   }
 })
 
-// Renderer confirmed leave — actually close the window
+// Renderer confirmed leave �?actually close the window
 ipcMain.handle('window:confirm-close', () => {
   allowClose = true
   awaitingLeaveDecision = false
@@ -115,7 +116,7 @@ ipcMain.handle('window:confirm-close', () => {
   return true
 })
 
-// Renderer cancelled leave dialog — allow another X click
+// Renderer cancelled leave dialog �?allow another X click
 ipcMain.handle('window:cancel-close', () => {
   awaitingLeaveDecision = false
   return true
@@ -200,7 +201,7 @@ ipcMain.handle(
   }
 )
 
-// 读取文件内容（用于 PDF/EPUB 等需要在渲染进程处理的格式）
+// 读取文件内容（用�?PDF/EPUB 等需要在渲染进程处理的格式）
 ipcMain.handle('file:read', async (_event, filePath: string) => {
   try {
     if (typeof filePath !== 'string' || !filePath.trim()) {
@@ -222,7 +223,7 @@ ipcMain.handle('fs:pathExists', async (_event, filePath: string) => {
   return existsSync(filePath)
 })
 
-/** Copy imported ebook into UserData/books/ — shelf no longer depends on Downloads path */
+/** Copy imported ebook into UserData/books/ �?shelf no longer depends on Downloads path */
 ipcMain.handle(
   'books:importCopy',
   async (_event, opts: { sourcePath: string; bookId: string }) => {
@@ -258,7 +259,7 @@ ipcMain.handle('shell:openExternal', async (_event, url: string) => {
   return true
 })
 
-// 打开音乐文件对话框
+// 打开音乐文件对话�?
 ipcMain.handle('dialog:openMusic', async () => {
   const result = await dialog.showOpenDialog({
     title: '打开音乐文件',
@@ -277,7 +278,7 @@ ipcMain.handle('app:getDataPath', () => {
   return app.getPath('userData')
 })
 
-// AI 请求代理（主进程发 HTTP，避免渲染进程 CORS 问题）
+// AI 请求代理（主进程�?HTTP，避免渲染进�?CORS 问题�?
 ipcMain.handle('ai:chat', async (_event, { baseUrl, apiKey, model, messages, maxTokens }) => {
   try {
     const response = await fetch(`${baseUrl}/chat/completions`, {
@@ -306,7 +307,7 @@ ipcMain.handle('ai:chat', async (_event, { baseUrl, apiKey, model, messages, max
   }
 })
 
-// AI 流式请求 — SSE chunks via webContents.send
+// AI 流式请求 �?SSE chunks via webContents.send
 ipcMain.handle(
   'ai:chatStream',
   async (event, { baseUrl, apiKey, model, messages, maxTokens, requestId }) => {
@@ -404,18 +405,18 @@ ipcMain.handle('covers:save', async (_event, bookId: string, dataUrl: string) =>
 
 ipcMain.handle('covers:url', (_event, bookId: string) => coverUrlFor(bookId))
 
-// Douban search proxy — Node.js https; returns structured errors for UI feedback
+// Douban search proxy �?Node.js https; returns structured errors for UI feedback
 ipcMain.handle('douban:search', async (_event, title: string, author?: string) => {
   return searchDoubanBook(title, author)
 })
 
-// One-shot bootstrap — avoids N sequential storage IPC round-trips on startup
+// One-shot bootstrap �?avoids N sequential storage IPC round-trips on startup
 ipcMain.handle('app:bootstrap', async () => {
   const t0 = Date.now()
   const books = bookStore.get('books', []) as unknown
   const booksArr = Array.isArray(books) ? books : []
 
-  // Defer inline-cover migration — don't block first paint
+  // Defer inline-cover migration �?don't block first paint
   const hasInlineCovers = booksArr.some(
     (b) => typeof b === 'object' && b && 'coverUrl' in b && typeof (b as { coverUrl?: string }).coverUrl === 'string'
       && (b as { coverUrl: string }).coverUrl.startsWith('data:')
@@ -443,7 +444,7 @@ ipcMain.handle('app:bootstrap', async () => {
   return payload
 })
 
-// 存储：读取（书架启动时顺便把内嵌封面迁到磁盘，避免 IPC 传几百 KB）
+// 存储：读取（书架启动时顺便把内嵌封面迁到磁盘，避�?IPC 传几�?KB�?
 ipcMain.handle('storage:get', async (_event, key: string, defaultValue: unknown) => {
   if (key.startsWith('books') || key.startsWith('book_')) {
     const value = bookStore.get(key, defaultValue)
@@ -461,7 +462,7 @@ ipcMain.handle('storage:get', async (_event, key: string, defaultValue: unknown)
   return settingsStore.get(key, defaultValue)
 })
 
-// 存储：写入
+// 存储：写�?
 ipcMain.handle('storage:set', async (_event, key: string, value: unknown) => {
   if (key.startsWith('books') || key.startsWith('book_')) {
     bookStore.set(key, value)
@@ -492,7 +493,7 @@ app.whenReady().then(() => {
   })
 })
 
-// 所有窗口关闭时退出（macOS 除外）
+// 所有窗口关闭时退出（macOS 除外�?
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()

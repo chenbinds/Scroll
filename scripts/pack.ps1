@@ -68,6 +68,19 @@ function Import-OfflineBinaries {
 
         $count++
         Write-Ok "  Offline cache: $name"
+
+        # Pre-extract winCodeSign so rcedit is available (electron-builder extraction fails on darwin symlinks)
+        if ($name -like 'winCodeSign*' -and -not (Test-Path (Join-Path $destDir 'winCodeSign-2.6.0\rcedit-x64.exe'))) {
+            $sevenZip = Join-Path $Root 'node_modules\7zip-bin\win\x64\7za.exe'
+            if (Test-Path $sevenZip) {
+                $extractDir = Join-Path $destDir 'winCodeSign-2.6.0'
+                # Extract ignoring darwin symlink errors (we only need Windows tools)
+                & $sevenZip x -bd -y $src "-o$extractDir" 2>&1 | Out-Null
+                if (Test-Path (Join-Path $extractDir 'rcedit-x64.exe')) {
+                    Write-Ok "  Pre-extracted winCodeSign (rcedit ready)"
+                }
+            }
+        }
     }
     return $count
 }
@@ -150,6 +163,29 @@ if (-not (Test-Path $exePath)) {
     Write-Err '[ERROR] release\win-unpacked\Scroll.exe not found.'
     exit 1
 }
+
+# --- Embed app icon into Scroll.exe via rcedit ---
+# Generate fresh ICO from PNG (multi-size, proper BMP format)
+$makeIcoScript = Join-Path $PSScriptRoot 'make-ico.js'
+if (Test-Path $makeIcoScript) {
+    node $makeIcoScript
+}
+
+$rceditPath = Join-Path $env:LOCALAPPDATA 'electron-builder\Cache\winCodeSign\winCodeSign-2.6.0\rcedit-x64.exe'
+$iconPath = Join-Path $Root 'resources\icon.ico'
+if ((Test-Path $rceditPath) -and (Test-Path $iconPath)) {
+    Write-Step 'Embedding app icon into Scroll.exe...'
+    & $rceditPath $exePath --set-icon $iconPath --set-version-string "ProductName" "Scroll" --set-version-string "FileDescription" "Scroll eBook Reader"
+    if ($LASTEXITCODE -eq 0) {
+        Write-Ok '  Icon embedded successfully.'
+    } else {
+        Write-Err "  rcedit failed (exit $LASTEXITCODE) - icon not set."
+    }
+} else {
+    if (-not (Test-Path $rceditPath)) { Write-Err "  rcedit not found at: $rceditPath" }
+    if (-not (Test-Path $iconPath))   { Write-Err "  icon.ico not found at: $iconPath" }
+}
+# --- End icon embedding ---
 
 Write-Step '[4/4] Creating dist folder and zip...'
 & (Join-Path $PSScriptRoot 'pack-release.ps1') -Root $Root -Version $version

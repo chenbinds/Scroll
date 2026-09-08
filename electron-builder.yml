@@ -1,5 +1,6 @@
 appId: com.scroll.ebook-reader
 productName: Scroll
+icon: icon.png
 directories:
   buildResources: resources
   output: release
@@ -8,6 +9,7 @@ files:
   - "!node_modules/**/*"
   - node_modules/pdfjs-dist/**/*
 win:
+  icon: icon.ico
   target:
     - target: dir
       arch: [x64]

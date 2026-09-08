@@ -129,10 +129,9 @@ export default function BookCard({ book, onClick, onDelete, onRefreshRating, onS
 
       <div
         onClick={onClick}
-        className="cursor-pointer rounded-md border border-gray-200 dark:border-gray-800
-                   hover:border-scroll-300 dark:hover:border-scroll-700
-                   hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-900
-                   overflow-hidden h-full"
+        className="cursor-pointer rounded-lg
+                   hover:shadow-lg transition-all duration-200 bg-white dark:bg-gray-900
+                   overflow-hidden h-full shadow-sm"
       >
         <div className="aspect-[3/4] bg-gradient-to-br from-gray-100 to-gray-200
                         dark:from-gray-800 dark:to-gray-700
@@ -144,7 +143,7 @@ export default function BookCard({ book, onClick, onDelete, onRefreshRating, onS
               loading="lazy"
               decoding="async"
               fetchPriority="low"
-              className="w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-fill"
             />
           ) : (
             <div className="text-center p-2 relative w-full h-full flex flex-col items-center justify-center">
