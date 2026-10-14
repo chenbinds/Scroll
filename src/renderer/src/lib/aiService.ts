@@ -17,6 +17,12 @@ export interface AiChatOptions {
   apiKey: string
   model: string
   maxTokens?: number
+  thinking?: 'enabled' | 'disabled'
+  reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high' | 'max'
+}
+
+function isDeepSeek(options: Pick<AiChatOptions, 'baseUrl' | 'model'>): boolean {
+  return /deepseek/i.test(`${options.baseUrl} ${options.model}`)
 }
 
 /**
@@ -31,11 +37,14 @@ export async function chat(
     apiKey: options.apiKey,
     model: options.model,
     messages,
-    maxTokens: options.maxTokens || 4096
+    maxTokens: options.maxTokens || 4096,
+    ...(options.thinking ? { thinking: { type: options.thinking } } : {}),
+    ...(options.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {})
   }
 
   const result = await window.scrollAPI.aiChat(params)
-  return result.choices?.[0]?.message?.content || ''
+  const content = result.choices?.[0]?.message?.content
+  return typeof content === 'string' ? content : ''
 }
 
 /**
@@ -154,7 +163,12 @@ export async function explain(
     { role: 'user', content: `上下文：${context.slice(0, 3000)}\n\n请解释："${term}"` }
   ]
 
-  return chat(messages, options)
+  // 只影响查义。右侧助手走 chatStream，不带这个字段，仍用模型默认思考。
+  return chat(messages, {
+    ...options,
+    reasoningEffort: undefined,
+    ...(isDeepSeek(options) ? { thinking: 'disabled' as const } : {})
+  })
 }
 
 // ============================================================

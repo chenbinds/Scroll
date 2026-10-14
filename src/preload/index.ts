@@ -96,6 +96,9 @@ export interface AiChatParams {
   model: string
   messages: { role: 'system' | 'user' | 'assistant'; content: string }[]
   maxTokens?: number
+  /** DeepSeek 思考开关。仅查义传入；右侧助手不传，沿用模型默认。 */
+  thinking?: { type: 'enabled' | 'disabled' }
+  reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high' | 'max'
 }
 
 export interface AiChatStreamParams extends AiChatParams {}

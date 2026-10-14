@@ -13,6 +13,8 @@ interface Props {
 
 const MAX_TERM = 2000
 const NOTE_MAX_LENGTH = 2000
+/** 查义已关闭思考。2000 token 对应笔记上限的 2000 字。 */
+const LOOKUP_MAX_TOKENS = NOTE_MAX_LENGTH
 const PANEL_WIDTH = 360
 
 interface SelState {
@@ -197,10 +199,15 @@ export default function SelectionLookup({ scrollRef }: Props) {
         baseUrl: aiConfig.baseUrl,
         apiKey: aiConfig.apiKey,
         model: aiConfig.model,
-        maxTokens: Math.min(aiConfig.maxTokens || 512, 512)
+        maxTokens: LOOKUP_MAX_TOKENS
       })
       if (seq !== seqRef.current) return
-      setResult(answer.trim().slice(0, NOTE_MAX_LENGTH))
+      const text = answer.trim()
+      if (!text) {
+        setError(t('lookup.empty'))
+        return
+      }
+      setResult(text.slice(0, NOTE_MAX_LENGTH))
     } catch (e) {
       if (seq !== seqRef.current) return
       setError(e instanceof Error ? e.message : t('lookup.failed'))

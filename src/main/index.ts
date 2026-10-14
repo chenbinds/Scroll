@@ -279,20 +279,33 @@ ipcMain.handle('app:getDataPath', () => {
 })
 
 // AI 请求代理（主进程�?HTTP，避免渲染进�?CORS 问题�?
-ipcMain.handle('ai:chat', async (_event, { baseUrl, apiKey, model, messages, maxTokens }) => {
+ipcMain.handle('ai:chat', async (_event, { baseUrl, apiKey, model, messages, maxTokens, thinking, reasoningEffort }) => {
   try {
+    const payload: Record<string, unknown> = {
+      model,
+      messages,
+      max_tokens: maxTokens || 4096,
+      temperature: 0.7
+    }
+    if (thinking?.type === 'enabled' || thinking?.type === 'disabled') {
+      payload.thinking = { type: thinking.type }
+    }
+    if (
+      reasoningEffort === 'minimal' ||
+      reasoningEffort === 'low' ||
+      reasoningEffort === 'medium' ||
+      reasoningEffort === 'high' ||
+      reasoningEffort === 'max'
+    ) {
+      payload.reasoning_effort = reasoningEffort
+    }
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       },
-      body: JSON.stringify({
-        model,
-        messages,
-        max_tokens: maxTokens || 4096,
-        temperature: 0.7
-      })
+      body: JSON.stringify(payload)
     })
 
     if (!response.ok) {

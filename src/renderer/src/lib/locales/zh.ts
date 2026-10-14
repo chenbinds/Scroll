@@ -102,6 +102,7 @@ const zh = {
   'lookup.action': '查义',
   'lookup.loading': '查询中…',
   'lookup.failed': '查询失败',
+  'lookup.empty': '模型没有返回释义。',
   'lookup.notConfigured': '请先在设置中配置 AI',
   'lookup.resultPlaceholder': '查义结果可在此编辑…',
   'lookup.save': '保存为笔记',

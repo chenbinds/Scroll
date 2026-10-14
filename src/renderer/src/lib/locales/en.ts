@@ -99,6 +99,7 @@ const en: Translations = {
   'lookup.action': 'Define',
   'lookup.loading': 'Looking up…',
   'lookup.failed': 'Lookup failed',
+  'lookup.empty': 'The model returned no definition.',
   'lookup.notConfigured': 'Configure AI in Settings first',
   'lookup.resultPlaceholder': 'Edit the definition here…',
   'lookup.save': 'Save as note',
